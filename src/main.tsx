@@ -458,8 +458,9 @@ function App({ data, clock, assignments, placements, allowPlacement, placeFileSt
           <span className="roster-chevron" aria-hidden="true" />
         </summary>
         {data.people.length > 0 && <div className="roster-actions">
-          {simulated && <label className="roster-size">현황 인원
-            <select value={activeIds.size} onChange={event => {
+          {simulated && <div className="roster-size">
+            <label htmlFor="active-roster-size">현황 인원</label>
+            <select id="active-roster-size" value={activeIds.size} onChange={event => {
               const count = Number(event.currentTarget.value)
               applyActiveRoster([...activePeople, ...appearances.filter(person => !activeIds.has(person.id))]
                 .slice(0, count).map(person => person.id))
@@ -467,7 +468,7 @@ function App({ data, clock, assignments, placements, allowPlacement, placeFileSt
               {Array.from({ length: appearances.length + 1 }, (_, count) =>
                 <option value={count} key={count}>{count}명</option>)}
             </select>
-          </label>}
+          </div>}
           <button type="button" onClick={openNotes} aria-haspopup="dialog">전달 메모</button>
           <button type="button" onClick={() => openAppearance(data.people[0].id)} aria-haspopup="dialog">직원 이름·캐릭터 설정</button>
         </div>}
