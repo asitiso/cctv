@@ -6,7 +6,6 @@ import type { SharedBoard } from '../src/shared-board.ts'
 const prefix = process.env.VERCEL_ENV === 'preview' ? 'preview-board/v1/' : 'shared-board/v1/'
 const cacheKey = 'cctv-shared-board-v1'
 const largestRevisionCode = 999_999_999_999
-const cache = getCache()
 
 function send(value: unknown, status = 200) {
   return Response.json(value, { status, headers: { 'Cache-Control': 'no-store' } })
@@ -31,6 +30,7 @@ function blobPath(revision: number) {
 
 async function publish(board: SharedBoard) {
   try {
+    const cache = getCache()
     await cache.set(cacheKey, board, { ttl: 3600, tags: [cacheKey] })
     const expected = board.revision ? blobPath(board.revision) : undefined
     if (await latestPath() !== expected) await cache.expireTag(cacheKey)
@@ -41,7 +41,7 @@ async function publish(board: SharedBoard) {
 
 async function readBoard() {
   try {
-    const cached = await cache.get(cacheKey) as SharedBoard | null
+    const cached = await getCache().get(cacheKey) as SharedBoard | null
     if (cached) return cached
   } catch {
     // Read the file directly if the cache is unavailable.
