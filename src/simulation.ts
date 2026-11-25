@@ -101,12 +101,14 @@ const supportAreas = ['stock', 'office', 'checkout', 'counsel', 'dispense', 'syr
 type SupportAssignment = { activity: Activity; normalActivity: Activity; deadline: number; arrivedAt?: number }
 
 export function createSimulation(data: DataSource, startMinute = data.initialMinute, selected: readonly string[] | null = null,
-  initialPlacements: DataSource['assignments'] = {}, initialDuty: readonly DutyOverride[] = []) {
+  initialPlacements: DataSource['assignments'] = {}, initialDuty: readonly DutyOverride[] = [],
+  initialRoster: readonly string[] = data.people.map(person => person.id)) {
   let elapsed = 0
   let remainder = 0
   let minute = startMinute
   let door = 0
   let revision = 0
+  let activeRoster = new Set(initialRoster)
   let staffing = selectedPeople(selected)
   let assignments = data.assignments
   let filePlacements = initialPlacements
@@ -132,7 +134,7 @@ export function createSimulation(data: DataSource, startMinute = data.initialMin
 
   function selectedPeople(ids: readonly string[] | null) {
     return ids && data.source === 'simulation'
-      ? new Set(data.people.filter(person => ids.includes(person.id)).map(person => person.id))
+      ? new Set(data.people.filter(person => activeRoster.has(person.id) && ids.includes(person.id)).map(person => person.id))
       : null
   }
 
@@ -143,6 +145,7 @@ export function createSimulation(data: DataSource, startMinute = data.initialMin
   }
 
   function attendanceOf(person: Person) {
+    if (!activeRoster.has(person.id)) return 'unconfirmed'
     return dutyOverrides.get(person.id) ?? scheduledAttendanceOf(person)
   }
 
@@ -218,10 +221,11 @@ export function createSimulation(data: DataSource, startMinute = data.initialMin
   const mascots = createMascots()
   function refreshPersonalities() {
     if (data.source !== 'simulation') return
-    manager = actors.find(actor => isManager(actor.person))
-    director = actors.find(actor => isDirector(actor.person))
-    jeongmin = actors.find(actor => isJeongmin(actor.person))
-    partners = actors.filter(actor => partnerSlot(actor.person) >= 0)
+    const active = actors.filter(actor => activeRoster.has(actor.person.id))
+    manager = active.find(actor => isManager(actor.person))
+    director = active.find(actor => isDirector(actor.person))
+    jeongmin = active.find(actor => isJeongmin(actor.person))
+    partners = active.filter(actor => partnerSlot(actor.person) >= 0)
   }
   refreshPersonalities()
   function occupiedByOthers(actor: Actor) {
@@ -515,6 +519,7 @@ export function createSimulation(data: DataSource, startMinute = data.initialMin
     get door() { return door },
     get revision() { return revision },
     get staffing() { return staffing ? [...staffing] : null },
+    get activeRoster() { return [...activeRoster] },
     get dutyOverrides(): DutyOverride[] { return [...dutyOverrides] },
     get freeWalking() { return nextWanderAt < Infinity },
     isDirectlyPlaced(person: Person) {
@@ -551,6 +556,35 @@ export function createSimulation(data: DataSource, startMinute = data.initialMin
     setDutyOverrides(next: readonly DutyOverride[]) {
       if (next.length !== dutyOverrides.size || next.some(([id, duty]) => dutyOverrides.get(id) !== duty)) updateDutyOverrides(next)
     },
+    setActiveRoster(ids: readonly string[]) {
+      if (data.source !== 'simulation') return
+      const next = new Set(data.people.filter(person => ids.includes(person.id)).map(person => person.id))
+      if (next.size === activeRoster.size && [...next].every(id => activeRoster.has(id))) return
+      for (const actor of actors) {
+        const id = actor.person.id
+        if (next.has(id) === activeRoster.has(id)) continue
+        if (next.has(id)) {
+          // Re-enter through the same placement logic used for returning from the cottage.
+          actor.duty = 'off'
+          if (staffing && (dutyOverrides.get(id) === 'working' || getDuty(data.shifts[id], minute) === 'working')) staffing.add(id)
+        } else {
+          actor.present = false
+          actor.leg = null
+          actor.moving = false
+          actor.remark = null
+          actor.duty = 'unconfirmed'
+          actor.activity = 'unknown'
+          actor.target = 'unknown'
+          supportAssignments.delete(actor)
+          demoPlacements.delete(id)
+          staffing?.delete(id)
+          if (wandering?.actor === actor) wandering = undefined
+        }
+      }
+      activeRoster = next
+      updateDutyOverrides([...dutyOverrides])
+      refreshPersonalities()
+    },
     setPlacementHeld(held: boolean) {
       if (data.source !== 'simulation' || placementHeld === held) return
       placementHeld = held
@@ -558,7 +592,7 @@ export function createSimulation(data: DataSource, startMinute = data.initialMin
     },
     placeStaff(id: string, activity: PlacementActivity) {
       const actor = actors.find(candidate => candidate.person.id === id)
-      if (!actor) return false
+      if (!actor || !activeRoster.has(id)) return false
       const returning = attendanceOf(actor.person) === 'off'
       if (!returning && (!canPlaceStaff(actor) || attendanceOf(actor.person) !== 'working')) return false
       if (activity === 'dayoff' || returning) {

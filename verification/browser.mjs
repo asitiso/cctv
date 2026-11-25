@@ -1,11 +1,13 @@
 import assert from 'node:assert/strict'
-import { mkdir } from 'node:fs/promises'
+import { mkdir, readFile } from 'node:fs/promises'
 import { createServer } from 'node:http'
+import { resolve, sep } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { chromium } from 'playwright'
 
 const app = process.env.BOARD_URL ?? pathToFileURL(fileURLToPath(new URL('../약국 CCTV.html', import.meta.url))).href
-const output = fileURLToPath(new URL('./', import.meta.url))
+const output = resolve(process.env.BOARD_SCREENSHOT_DIR ?? fileURLToPath(new URL('./', import.meta.url))) + sep
+const allStaff = JSON.parse(await readFile(new URL('../src/demo.json', import.meta.url), 'utf8')).people.map(person => person.id)
 const duration = Number(process.env.BOARD_ENDURANCE_MS ?? 0)
 const browser = await chromium.launch({ channel: process.env.BOARD_BROWSER ?? 'chrome' })
 const errors = []
@@ -15,7 +17,7 @@ const tick = (page, amount) => page.evaluate(ms => window.advanceTime(ms), amoun
 
 await mkdir(output, { recursive: true })
 
-async function open(viewport, extras = {}, clockTime) {
+async function open(viewport, extras = {}, clockTime, fullRoster = true) {
   const page = await browser.newPage({ viewport, offline: app.startsWith('file:'), ...extras })
   page.on('pageerror', error => errors.push(error.message))
   page.on('console', message => {
@@ -27,10 +29,51 @@ async function open(viewport, extras = {}, clockTime) {
     })
   }
   if (clockTime) await page.clock.install({ time: clockTime })
+  if (fullRoster) await page.addInitScript(ids => {
+    const key = 'pharmacy-cctv:active-roster:v1'
+    if (localStorage.getItem(key) === null) localStorage.setItem(key, JSON.stringify(ids))
+  }, allStaff)
   await page.goto(app)
   await page.waitForFunction(() => document.querySelector('.scene[data-ready=true]') && window.render_game_to_text)
   await page.evaluate(() => document.fonts.ready)
   return page
+}
+
+async function checkActiveRoster() {
+  const page = await open({ width: 1440, height: 900 }, {}, undefined, false)
+  const rows = page.locator('.roster li')
+  const switchFor = name => page.getByRole('switch', { name: name + ' 현황 표시', exact: true })
+  try {
+    await tick(page, 0)
+    assert.deepEqual((await status(page)).activeRoster, allStaff.slice(0, 10))
+    assert.equal(await page.locator('.working-count strong').textContent(), '9명')
+    await page.locator('.roster summary').click()
+    assert.equal(await rows.count(), 10)
+    await switchFor('서연').click()
+    assert.equal(await rows.count(), 9)
+    assert.equal((await status(page)).actors.find(actor => actor.name === '서연').present, false)
+    await page.getByRole('button', { name: /예비 직원 7명/ }).click()
+    assert.equal(await switchFor('서연').getAttribute('aria-checked'), 'false')
+    await switchFor('소라').click()
+    assert.equal(await rows.count(), 10)
+    assert.equal((await status(page)).actors.find(actor => actor.name === '소라').present, true)
+    await checkLayout(page)
+    await page.screenshot({ path: output + 'active-staff-and-reserves.png' })
+
+    const count = page.getByLabel('현황 인원', { exact: true })
+    await count.selectOption('4')
+    assert.equal(await rows.count(), 4)
+    await count.selectOption('0')
+    assert.equal(await rows.count(), 0)
+    assert.equal(await page.locator('.working-count strong').textContent(), '0명')
+    assert.equal(await page.getByRole('switch').count(), 16)
+    await count.selectOption('12')
+    assert.equal(await rows.count(), 12)
+    await page.reload()
+    await page.waitForFunction(() => window.render_game_to_text && JSON.parse(window.render_game_to_text()).activeRoster.length === 12)
+  } finally {
+    await page.close()
+  }
 }
 
 async function checkStaffPlacement() {
@@ -826,6 +869,7 @@ async function checkCalendarRoster() {
 }
 
 try {
+  await checkActiveRoster()
   await checkMascots()
   await checkSnackBreaks()
   await checkCocoFollowing()

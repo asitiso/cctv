@@ -7,7 +7,7 @@ import { COTTAGE, project } from './layout.ts'
 import { createRenderer, loadArt } from './renderer.ts'
 import { createSimulation, PLACEMENT_IDLE_MS } from './simulation.ts'
 import type { Actor, Duty, Simulation } from './simulation.ts'
-import { readStaffing, saveStaffing, StaffingControl } from './staffing.tsx'
+import { readActiveRoster, readStaffing, saveActiveRoster, saveStaffing, StaffingControl } from './staffing.tsx'
 import { createRosterData, koreaClock } from './schedule.ts'
 import type { KoreaClock, RosterBook } from './schedule.ts'
 import { readRoster, saveRoster, ScheduleDialog } from './schedule-dialog.tsx'
@@ -104,13 +104,15 @@ function App({ data, clock, assignments, placements, allowPlacement, placeFileSt
   const simulated = data.source === 'simulation'
   const [simulation] = useState(() => {
     const current = createSimulation({ ...data, assignments }, simulated ? data.initialMinute : clock.minute,
-      readStaffing(), placements, allowPlacement ? readBoardDuty(clock.date, data) : [])
+      readStaffing(), placements, allowPlacement ? readBoardDuty(clock.date, data) : [],
+      simulated ? readActiveRoster(data.people) : undefined)
     current.setAppearances(appearances)
     return current
   })
   const [snapshot, setSnapshot] = useState(() => readSnapshot(simulation, simulated))
   const [paused, setPaused] = useState(false)
   const [cottageOpen, setCottageOpen] = useState(false)
+  const [reservesOpen, setReservesOpen] = useState(false)
   const [rosterOpen, setRosterOpen] = useState(() => Boolean(data.calendar)
     || matchMedia('(max-width: 800px), (max-aspect-ratio: 5/4)').matches)
   const [fullscreen, setFullscreen] = useState(false)
@@ -168,12 +170,16 @@ function App({ data, clock, assignments, placements, allowPlacement, placeFileSt
     if (!knownSchedule) workLabel = calendar.inMonth ? '달력 근무표 · 현재 인원 미확인' : '달력 근무표 · 오늘 일정 미확인'
   }
   const workControl = feedState ? '내부 시스템 연동 설정' : calendar ? '달력 근무시간 설정' : '업무 상태 가져오기'
-  const workers = snapshot.actors.filter(actor => actor.duty === 'working' || actor.duty === 'break')
-  const cottageGuests = appearances.filter(person => snapshot.actors.some(actor => actor.id === person.id && actor.duty === 'off'))
+  const activeIds = new Set(simulation.activeRoster)
+  const activeActors = snapshot.actors.filter(actor => activeIds.has(actor.id))
+  const activePeople = appearances.filter(person => activeIds.has(person.id))
+  const reserves = simulated ? snapshot.actors.filter(actor => !activeIds.has(actor.id)) : []
+  const workers = activeActors.filter(actor => actor.duty === 'working' || actor.duty === 'break')
+  const cottageGuests = activePeople.filter(person => activeActors.some(actor => actor.id === person.id && actor.duty === 'off'))
   const rosterActors = calendar ? [
-    ...snapshot.actors.filter(actor => calendar.planned.includes(actor.id)),
-    ...snapshot.actors.filter(actor => !calendar.planned.includes(actor.id)),
-  ] : snapshot.actors
+    ...activeActors.filter(actor => calendar.planned.includes(actor.id)),
+    ...activeActors.filter(actor => !calendar.planned.includes(actor.id)),
+  ] : activeActors
   const countLabel = calendar && !knownSchedule
     ? (calendar.inMonth ? '오늘 예정 ' + calendar.planned.length + '명' : '오늘 예정 미확인')
     : '근무표상 ' + workers.length + '명'
@@ -182,6 +188,16 @@ function App({ data, clock, assignments, placements, allowPlacement, placeFileSt
     simulation.setStaffing(ids)
     saveStaffing(simulation.staffing)
     saveBoardDuty(clock.date, data, simulation.dutyOverrides)
+    setSnapshot(readSnapshot(simulation, simulated))
+  }
+
+  function applyActiveRoster(ids: string[]) {
+    const currentPick = placement.picked
+    if (currentPick && !ids.includes(currentPick.id)) placement.dismiss()
+    simulation.setActiveRoster(ids)
+    saveActiveRoster(simulation.activeRoster)
+    saveStaffing(simulation.staffing)
+    if (!ids.length) setReservesOpen(true)
     setSnapshot(readSnapshot(simulation, simulated))
   }
 
@@ -285,7 +301,7 @@ function App({ data, clock, assignments, placements, allowPlacement, placeFileSt
         coordinateSystem: 'walkable floor tiles projected into the pharmacy image; the cottage is a separate inset',
         mode: data.source, minute: simulation.minute, elapsed: simulation.time, day: simulation.day,
         paused: toggleFrame.current, door: simulation.door, staffing: simulation.staffing, rendered: true,
-        freeWalking: simulation.freeWalking,
+        freeWalking: simulation.freeWalking, activeRoster: simulation.activeRoster,
         calendar: data.calendar,
         pets: simulation.mascots.map(pet => ({
           id: pet.id, name: pet.name, screen: project(pet.x, pet.y), moving: Boolean(pet.leg),
@@ -333,7 +349,7 @@ function App({ data, clock, assignments, placements, allowPlacement, placeFileSt
         <Time {...clock} />
         <span className="separator" aria-hidden="true" />
         {simulated
-          ? <StaffingControl people={appearances} onDuty={workers.length}
+          ? <StaffingControl people={activePeople} onDuty={workers.length}
               current={workers.map(actor => actor.id)} apply={applyStaffing} openRoster={openRoster} />
           : <button className="working-count staffing-trigger" type="button" onClick={openRoster} aria-haspopup="dialog"
               aria-label={feedState && !feedState.snapshot ? '내부 시스템 연동, 근무표 대기' : '근무표 관리, ' + countLabel}>
@@ -438,10 +454,20 @@ function App({ data, clock, assignments, placements, allowPlacement, placeFileSt
       <details className="roster" open={rosterOpen} onToggle={event => setRosterOpen(event.currentTarget.open)}>
         <summary>
           <span className="person-icon" aria-hidden="true" />
-          <span>{calendar ? '달력 명단' : '직원 현황'} <strong>{snapshot.actors.length}명</strong></span>
+          <span>{calendar ? '달력 명단' : '직원 현황'} <strong>{rosterActors.length}명</strong></span>
           <span className="roster-chevron" aria-hidden="true" />
         </summary>
         {data.people.length > 0 && <div className="roster-actions">
+          {simulated && <label className="roster-size">현황 인원
+            <select value={activeIds.size} onChange={event => {
+              const count = Number(event.currentTarget.value)
+              applyActiveRoster([...activePeople, ...appearances.filter(person => !activeIds.has(person.id))]
+                .slice(0, count).map(person => person.id))
+            }}>
+              {Array.from({ length: appearances.length + 1 }, (_, count) =>
+                <option value={count} key={count}>{count}명</option>)}
+            </select>
+          </label>}
           <button type="button" onClick={openNotes} aria-haspopup="dialog">전달 메모</button>
           <button type="button" onClick={() => openAppearance(data.people[0].id)} aria-haspopup="dialog">직원 이름·캐릭터 설정</button>
         </div>}
@@ -462,11 +488,26 @@ function App({ data, clock, assignments, placements, allowPlacement, placeFileSt
               {actor.placed && <small className="roster-placement">직접 지정</small>}
             </span>
           </span>
-          <span className="roster-duty">{planned ? '근무 예정' : !simulated && actor.duty === 'working' ? '근무표상 근무'
+          <span className="roster-status"><span className="roster-duty">{planned ? '근무 예정' : !simulated && actor.duty === 'working' ? '근무표상 근무'
               : !simulated && actor.duty === 'departed' ? '근무시간 종료'
                 : !simulated && actor.duty === 'before' ? '근무시간 전' : dutyLabels[actor.duty]}</span>
+            {simulated && <button type="button" className="roster-switch" role="switch" aria-checked="true"
+              aria-label={actor.name + ' 현황 표시'} onClick={() => applyActiveRoster([...activeIds].filter(id => id !== actor.id))}>ON</button>}
+          </span>
           {note && <span className="roster-note"><strong>{note.author}</strong> {note.text}</span>}
         </li>})}</ul>
+        {reserves.length > 0 && <div className="roster-reserves">
+          <button type="button" className="roster-reserve-toggle" aria-expanded={reservesOpen} aria-controls="reserve-employees"
+            onClick={() => setReservesOpen(open => !open)}>예비 직원 {reserves.length}명 <span aria-hidden="true">{reservesOpen ? '▴' : '▾'}</span></button>
+          {reservesOpen && <div id="reserve-employees" className="roster-reserve-list">
+            {reserves.map(actor => <div key={actor.id}>
+              <button type="button" className="roster-name roster-name-button" aria-label={actor.name + ' 이름·캐릭터 설정'}
+                aria-haspopup="dialog" onClick={() => openAppearance(actor.id)}><span>{actor.name}</span></button>
+              <button type="button" className="roster-switch" role="switch" aria-checked="false"
+                aria-label={actor.name + ' 현황 표시'} onClick={() => applyActiveRoster([...activeIds, actor.id])}>OFF</button>
+            </div>)}
+          </div>}
+        </div>}
       </details>
     </main>
   </div>

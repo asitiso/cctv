@@ -440,6 +440,23 @@ button:focus-visible { outline: 2px solid #527d65; outline-offset: 4px; }
 }
 
 .roster-actions { gap: 6px; }
+.roster-actions { flex-wrap: wrap; align-items: center; }
+.roster-size { display: flex; margin-right: auto; align-items: center; gap: 5px; font-size: 11px; font-weight: 750; }
+.roster-size select { padding: 3px 5px; border: 1px solid #c0cdb4; border-radius: 6px; color: inherit; background: #fffdf4; }
+.roster-status { display: flex; align-items: center; gap: 4px; }
+.roster-switch {
+  padding: 3px 5px; min-width: 29px; border: 1px solid #aec0a1; border-radius: 6px;
+  font-size: 9px; font-weight: 850; background: #e9e8dd; color: #575a4c; cursor: pointer;
+}
+.roster-switch[aria-checked="true"] { background: #dcebd4; color: #34563b; }
+.roster-switch:hover { border-color: #4b7651; }
+.roster-reserves { border-top: 1px solid #dbe2d0; padding: 3px 11px 8px; }
+.roster-reserve-toggle {
+  display: flex; justify-content: space-between; width: 100%; border: 0; color: inherit;
+  background: transparent; padding: 5px 0; font-weight: 800; cursor: pointer;
+}
+.roster-reserve-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px 10px; }
+.roster-reserve-list > div { display: flex; justify-content: space-between; gap: 4px; }
 .roster-note {
   grid-column: 2 / -1; overflow-wrap: anywhere; margin-top: 1px; padding: 4px 6px;
   font-size: 10px; line-height: 1.35; color: #42614b; background: #e6efe1; border-radius: 5px;

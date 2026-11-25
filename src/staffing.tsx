@@ -4,6 +4,27 @@ import type { Person } from './data.ts'
 import { staffName } from './data.ts'
 
 const storageKey = 'pharmacy-cctv:staffing:v1'
+const rosterKey = 'pharmacy-cctv:active-roster:v1'
+
+export function readActiveRoster(people: readonly Person[]): string[] {
+  try {
+    const saved: unknown = JSON.parse(localStorage.getItem(rosterKey) ?? 'null')
+    if (Array.isArray(saved) && saved.every(id => typeof id === 'string')) {
+      return people.filter(person => saved.includes(person.id)).map(person => person.id)
+    }
+  } catch {
+    // Use the initial ten members when settings are unavailable.
+  }
+  return people.slice(0, 10).map(person => person.id)
+}
+
+export function saveActiveRoster(ids: readonly string[]) {
+  try {
+    localStorage.setItem(rosterKey, JSON.stringify(ids))
+  } catch {
+    // The current selection still applies until the page is closed.
+  }
+}
 
 export function readStaffing(): string[] | null {
   try {

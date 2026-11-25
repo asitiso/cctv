@@ -51,6 +51,21 @@ test('별장에 놓은 직원은 휴무가 되고 기존 휴무자도 약국으�
   assert.equal(board.actors.find(actor => actor.person.id === 'yuna')!.duty, 'off')
 })
 
+test('예비 직원은 약국과 휴무 별장에 나타나지 않고 활성화한 직원만 근무표를 따른다', () => {
+  const active = demo.people.slice(0, 10).map(person => person.id)
+  const board = createSimulation(demo, demo.initialMinute, null, {}, [], active)
+  const [seoyeon] = board.actors
+  const sora = board.actors.find(actor => actor.person.id === 'sora')!
+  const taeho = board.actors.find(actor => actor.person.id === 'taeho')!
+  assert.ok(!sora.present && !taeho.present)
+  assert.equal(board.placeStaff('taeho', 'stock'), false)
+  assert.ok(board.placeStaff('seoyeon', 'dayoff'))
+  board.setActiveRoster([...active.filter(id => id !== 'seoyeon'), 'sora'])
+  assert.ok(!seoyeon.present && sora.present && sora.duty === 'working')
+  board.setActiveRoster([...active, 'sora'])
+  assert.ok(seoyeon.present && seoyeon.duty === 'off')
+})
+
 test('강아지와 고양이는 통로를 산책하고 번갈아 응원한다', () => {
   const board = createSimulation(demo)
   assert.deepEqual(board.mascots.map(pet => pet.id), ['dog', 'cat'])
