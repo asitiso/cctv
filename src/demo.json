@@ -1,0 +1,527 @@
+{
+  "source": "simulation",
+  "initialMinute": 624,
+  "millisecondsPerMinute": 5000,
+  "people": [
+    {
+      "id": "seoyeon",
+      "name": "서연",
+      "role": "약사",
+      "color": "#608a72",
+      "sprite": "staff-1",
+      "home": "dispense"
+    },
+    {
+      "id": "junho",
+      "name": "준호",
+      "role": "약사",
+      "color": "#d69448",
+      "sprite": "staff-2",
+      "home": "syrup"
+    },
+    {
+      "id": "jieun",
+      "name": "지은",
+      "role": "직원",
+      "color": "#c68252",
+      "sprite": "staff-3",
+      "home": "checkout"
+    },
+    {
+      "id": "hayun",
+      "name": "하윤",
+      "role": "직원",
+      "color": "#c57e8d",
+      "sprite": "staff-4",
+      "home": "counsel"
+    },
+    {
+      "id": "minjae",
+      "name": "민재",
+      "role": "직원",
+      "color": "#7196a8",
+      "sprite": "staff-5",
+      "home": "stock"
+    },
+    {
+      "id": "yuna",
+      "name": "유나",
+      "role": "직원",
+      "color": "#a587ae",
+      "sprite": "staff-6",
+      "home": "office",
+      "restArt": {
+        "read": "rest-book",
+        "sleep": "rest-sleep",
+        "stretch": "rest-stretch"
+      }
+    },
+    {
+      "id": "subin",
+      "name": "수빈",
+      "role": "약사",
+      "color": "#9b86af",
+      "sprite": "staff-7",
+      "home": "dispense"
+    },
+    {
+      "id": "doyun",
+      "name": "도윤",
+      "role": "약사",
+      "color": "#6f9fac",
+      "sprite": "staff-8",
+      "home": "office"
+    },
+    {
+      "id": "naeun",
+      "name": "나은",
+      "role": "직원",
+      "color": "#7b9563",
+      "sprite": "staff-9",
+      "home": "counsel"
+    },
+    {
+      "id": "hyunwoo",
+      "name": "현우",
+      "role": "직원",
+      "color": "#63928b",
+      "sprite": "staff-10",
+      "home": "lounge"
+    },
+    {
+      "id": "sora",
+      "name": "소라",
+      "role": "직원",
+      "color": "#cc7e75",
+      "sprite": "staff-11",
+      "home": "checkout"
+    },
+    {
+      "id": "taeho",
+      "name": "태호",
+      "role": "직원",
+      "color": "#918c53",
+      "sprite": "staff-12",
+      "home": "stock",
+      "restArt": {
+        "bench": "rest-taeho-bench"
+      }
+    },
+    {
+      "id": "eunseo",
+      "name": "은서",
+      "role": "직원",
+      "color": "#597d73",
+      "sprite": "staff-13",
+      "home": "office"
+    },
+    {
+      "id": "dahee",
+      "name": "다희",
+      "role": "직원",
+      "color": "#c59a50",
+      "sprite": "staff-14",
+      "home": "syrup"
+    },
+    {
+      "id": "chaewon",
+      "name": "채원",
+      "role": "직원",
+      "color": "#7d8da1",
+      "sprite": "staff-15",
+      "home": "stock"
+    },
+    {
+      "id": "bora",
+      "name": "보라",
+      "role": "직원",
+      "color": "#a7788e",
+      "sprite": "staff-16",
+      "home": "lounge"
+    }
+  ],
+  "shifts": {
+    "seoyeon": {
+      "start": 540,
+      "end": 1080
+    },
+    "junho": {
+      "start": 540,
+      "end": 1110
+    },
+    "jieun": {
+      "start": 535,
+      "end": 1085
+    },
+    "hayun": {
+      "start": 555,
+      "end": 1095
+    },
+    "minjae": {
+      "start": 530,
+      "end": 1065
+    },
+    "yuna": null,
+    "subin": {
+      "start": 547,
+      "end": 1090
+    },
+    "doyun": {
+      "start": 557,
+      "end": 1120
+    },
+    "naeun": {
+      "start": 542,
+      "end": 1085
+    },
+    "hyunwoo": {
+      "start": 532,
+      "end": 1075
+    },
+    "sora": {
+      "start": 550,
+      "end": 1110
+    },
+    "taeho": null,
+    "eunseo": {
+      "start": 555,
+      "end": 1115
+    },
+    "dahee": {
+      "start": 552,
+      "end": 1095
+    },
+    "chaewon": {
+      "start": 545,
+      "end": 1105
+    },
+    "bora": {
+      "start": 539,
+      "end": 1100
+    }
+  },
+  "assignments": {
+    "seoyeon": [
+      {
+        "at": 540,
+        "activity": "dispense"
+      },
+      {
+        "at": 633,
+        "activity": "pack"
+      },
+      {
+        "at": 641,
+        "activity": "coffee"
+      },
+      {
+        "at": 647,
+        "activity": "prescription"
+      },
+      {
+        "at": 785,
+        "activity": "lunch"
+      },
+      {
+        "at": 815,
+        "activity": "dispense"
+      }
+    ],
+    "junho": [
+      {
+        "at": 540,
+        "activity": "syrup"
+      },
+      {
+        "at": 627,
+        "activity": "office"
+      },
+      {
+        "at": 638,
+        "activity": "syrup"
+      },
+      {
+        "at": 720,
+        "activity": "lunch"
+      },
+      {
+        "at": 750,
+        "activity": "syrup"
+      }
+    ],
+    "jieun": [
+      {
+        "at": 535,
+        "activity": "checkout"
+      },
+      {
+        "at": 635,
+        "activity": "coffee"
+      },
+      {
+        "at": 640,
+        "activity": "checkout"
+      },
+      {
+        "at": 767,
+        "activity": "lunch"
+      },
+      {
+        "at": 797,
+        "activity": "checkout"
+      }
+    ],
+    "hayun": [
+      {
+        "at": 555,
+        "activity": "counsel"
+      },
+      {
+        "at": 631,
+        "activity": "guidance"
+      },
+      {
+        "at": 638,
+        "activity": "inventory"
+      },
+      {
+        "at": 646,
+        "activity": "counsel"
+      },
+      {
+        "at": 748,
+        "activity": "lunch"
+      },
+      {
+        "at": 778,
+        "activity": "guidance"
+      }
+    ],
+    "minjae": [
+      {
+        "at": 530,
+        "activity": "stock"
+      },
+      {
+        "at": 629,
+        "activity": "inventory"
+      },
+      {
+        "at": 643,
+        "activity": "office"
+      },
+      {
+        "at": 653,
+        "activity": "stock"
+      },
+      {
+        "at": 730,
+        "activity": "lunch"
+      },
+      {
+        "at": 760,
+        "activity": "stock"
+      }
+    ],
+    "yuna": [],
+    "subin": [
+      {
+        "at": 547,
+        "activity": "prescription"
+      },
+      {
+        "at": 631,
+        "activity": "pack"
+      },
+      {
+        "at": 700,
+        "activity": "dispense"
+      },
+      {
+        "at": 775,
+        "activity": "lunch"
+      },
+      {
+        "at": 806,
+        "activity": "prescription"
+      }
+    ],
+    "doyun": [
+      {
+        "at": 557,
+        "activity": "office"
+      },
+      {
+        "at": 637,
+        "activity": "prescription"
+      },
+      {
+        "at": 645,
+        "activity": "office"
+      },
+      {
+        "at": 792,
+        "activity": "lunch"
+      },
+      {
+        "at": 824,
+        "activity": "office"
+      }
+    ],
+    "naeun": [
+      {
+        "at": 542,
+        "activity": "guidance"
+      },
+      {
+        "at": 642,
+        "activity": "checkout"
+      },
+      {
+        "at": 654,
+        "activity": "counsel"
+      },
+      {
+        "at": 732,
+        "activity": "lunch"
+      },
+      {
+        "at": 763,
+        "activity": "guidance"
+      }
+    ],
+    "hyunwoo": [
+      {
+        "at": 532,
+        "activity": "stock"
+      },
+      {
+        "at": 620,
+        "activity": "coffee"
+      },
+      {
+        "at": 629,
+        "activity": "stock"
+      },
+      {
+        "at": 738,
+        "activity": "coffee"
+      },
+      {
+        "at": 747,
+        "activity": "inventory"
+      }
+    ],
+    "sora": [
+      {
+        "at": 550,
+        "activity": "checkout"
+      },
+      {
+        "at": 638,
+        "activity": "coffee"
+      },
+      {
+        "at": 646,
+        "activity": "checkout"
+      },
+      {
+        "at": 803,
+        "activity": "lunch"
+      },
+      {
+        "at": 830,
+        "activity": "checkout"
+      }
+    ],
+    "taeho": [],
+    "eunseo": [
+      {
+        "at": 555,
+        "activity": "office"
+      },
+      {
+        "at": 632,
+        "activity": "inventory"
+      },
+      {
+        "at": 642,
+        "activity": "office"
+      },
+      {
+        "at": 714,
+        "activity": "lunch"
+      },
+      {
+        "at": 747,
+        "activity": "office"
+      }
+    ],
+    "dahee": [
+      {
+        "at": 552,
+        "activity": "syrup"
+      },
+      {
+        "at": 635,
+        "activity": "pack"
+      },
+      {
+        "at": 645,
+        "activity": "syrup"
+      },
+      {
+        "at": 721,
+        "activity": "lunch"
+      },
+      {
+        "at": 754,
+        "activity": "syrup"
+      }
+    ],
+    "chaewon": [
+      {
+        "at": 545,
+        "activity": "inventory"
+      },
+      {
+        "at": 640,
+        "activity": "office"
+      },
+      {
+        "at": 648,
+        "activity": "stock"
+      },
+      {
+        "at": 759,
+        "activity": "lunch"
+      },
+      {
+        "at": 791,
+        "activity": "inventory"
+      }
+    ],
+    "bora": [
+      {
+        "at": 539,
+        "activity": "counsel"
+      },
+      {
+        "at": 620,
+        "activity": "coffee"
+      },
+      {
+        "at": 629,
+        "activity": "guidance"
+      },
+      {
+        "at": 750,
+        "activity": "lunch"
+      },
+      {
+        "at": 780,
+        "activity": "counsel"
+      }
+    ]
+  }
+}
