@@ -7,10 +7,12 @@
     "dev": "vite --host 127.0.0.1",
     "build": "tsc --noEmit && vite build && node scripts/standalone.mjs",
     "preview": "vite preview --host 127.0.0.1",
-    "test": "node --disable-warning=ExperimentalWarning --test src/simulation.test.ts src/schedule.test.ts src/work-status.test.ts src/appearance.test.ts src/notes.test.ts src/internal-feed.test.ts",
+    "test": "node --disable-warning=ExperimentalWarning --test src/simulation.test.ts src/schedule.test.ts src/work-status.test.ts src/appearance.test.ts src/notes.test.ts src/internal-feed.test.ts src/shared-board.test.ts",
     "test:browser": "node verification/browser.mjs"
   },
   "dependencies": {
+    "@vercel/blob": "^2.9.0",
+    "@vercel/functions": "^3.11.3",
     "react": "^19.2.0",
     "react-dom": "^19.2.0"
   },
@@ -21,5 +23,10 @@
     "playwright": "^1.58.0",
     "typescript": "~5.9.3",
     "vite": "^8.0.0"
+  },
+  "overrides": {
+    "@vercel/cli-config": {
+      "zod": "4.6.7"
+    }
   }
 }

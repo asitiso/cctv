@@ -113,6 +113,7 @@ export function createSimulation(data: DataSource, startMinute = data.initialMin
   let assignments = data.assignments
   let filePlacements = initialPlacements
   const demoPlacements = new Map<string, WorkPlacement>()
+  let sharedWork = new Map<string, WorkPlacement>()
   let dutyOverrides = new Map(initialDuty)
   let lastPlacement = 0
   let lastPlacedIndex: number | null = null
@@ -164,7 +165,7 @@ export function createSimulation(data: DataSource, startMinute = data.initialMin
   }
 
   function placedActivity(person: Person) {
-    return demoPlacements.get(person.id) ?? assignmentAt(filePlacements, person, minute)
+    return demoPlacements.get(person.id) ?? sharedWork.get(person.id) ?? assignmentAt(filePlacements, person, minute)
   }
 
   function placeWork(actor: Actor, activity: WorkPlacement) {
@@ -361,12 +362,13 @@ export function createSimulation(data: DataSource, startMinute = data.initialMin
     if (!actor.present) return
     const attendance = attendanceOf(actor.person)
     const outing = wandering?.actor === actor && attendance === 'working' ? wandering : undefined
-    const oversight = managerVisit?.actor === actor && attendance === 'working' && !demoPlacements.has(actor.person.id)
+    const explicitlyPlaced = demoPlacements.has(actor.person.id) || sharedWork.has(actor.person.id)
+    const oversight = managerVisit?.actor === actor && attendance === 'working' && !explicitlyPlaced
       ? managerVisit : null
     const ordinary = activityOf(actor.person, attendance)
     const support = supportActivity(actor, ordinary, attendance)
-    const snack = actor === snacking && attendance === 'working' && !demoPlacements.has(actor.person.id)
-    const canRotate = data.source === 'simulation' && attendance === 'working' && !demoPlacements.has(actor.person.id)
+    const snack = actor === snacking && attendance === 'working' && !explicitlyPlaced
+    const canRotate = data.source === 'simulation' && attendance === 'working' && !explicitlyPlaced
     const preferLab = canRotate && partners.includes(actor) && !isBreak(ordinary) && preferCompounding(actor.person, elapsed)
     const planned = preferLab && activities[ordinary].zone !== 'dispense' ? 'dispense' : ordinary
     const target = support ?? oversight?.activity ?? (snack ? 'coffee' : outing ? 'wander' : planned)
@@ -478,10 +480,10 @@ export function createSimulation(data: DataSource, startMinute = data.initialMin
     }
     for (const actor of actors) advanceActor(actor)
     const managerInRoom = manager?.present && manager.x < 20 && attendanceOf(manager.person) === 'working' ? manager : undefined
-    managerVisit = managerRoutine.update(managerInRoom && !demoPlacements.has(managerInRoom.person.id) &&
+    managerVisit = managerRoutine.update(managerInRoom && !placedActivity(managerInRoom.person) &&
       !supportAssignments.has(managerInRoom) ? managerInRoom : undefined, elapsed)
     const canTakeSnack = jeongmin?.present && jeongmin.x < 20 && attendanceOf(jeongmin.person) === 'working' &&
-      !demoPlacements.has(jeongmin.person.id) && !supportAssignments.has(jeongmin) &&
+      !placedActivity(jeongmin.person) && !supportAssignments.has(jeongmin) &&
       wandering?.actor !== jeongmin && !isBreak(activityOf(jeongmin.person, 'working'))
     snacking = snackDetour(managerVisit, canTakeSnack ? jeongmin : undefined, elapsed)
     chooseWanderer()
@@ -556,6 +558,25 @@ export function createSimulation(data: DataSource, startMinute = data.initialMin
     setDutyOverrides(next: readonly DutyOverride[]) {
       if (next.length !== dutyOverrides.size || next.some(([id, duty]) => dutyOverrides.get(id) !== duty)) updateDutyOverrides(next)
     },
+    setSharedWork(entries: readonly (readonly [string, WorkPlacement])[]) {
+      if (data.source !== 'simulation') return
+      const next = new Map(entries)
+      const changed = actors.filter(actor => {
+        const id = actor.person.id
+        return sharedWork.get(id) !== next.get(id) || (next.has(id) && demoPlacements.has(id))
+      })
+      sharedWork = next
+      for (const actor of changed) {
+        demoPlacements.delete(actor.person.id)
+        if (next.has(actor.person.id)) {
+          supportAssignments.delete(actor)
+          if (wandering?.actor === actor) wandering = undefined
+        }
+        actor.retryAt = 0
+        planActor(actor)
+      }
+      if (changed.length) revision++
+    },
     setActiveRoster(ids: readonly string[]) {
       if (data.source !== 'simulation') return
       const next = new Set(data.people.filter(person => ids.includes(person.id)).map(person => person.id))
@@ -577,6 +598,7 @@ export function createSimulation(data: DataSource, startMinute = data.initialMin
           actor.target = 'unknown'
           supportAssignments.delete(actor)
           demoPlacements.delete(id)
+          sharedWork.delete(id)
           staffing?.delete(id)
           if (wandering?.actor === actor) wandering = undefined
         }
@@ -642,6 +664,7 @@ export function createSimulation(data: DataSource, startMinute = data.initialMin
       staffing = next
       dutyOverrides.clear()
       demoPlacements.clear()
+      sharedWork.clear()
       supportAssignments.clear()
       lastPlacedIndex = null
       nextWanderAt = Infinity

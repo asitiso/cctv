@@ -90,6 +90,7 @@ button:focus-visible { outline: 2px solid #527d65; outline-offset: 4px; }
 .mode-chip { right: 15px; border-radius: 99px; }
 .mode-dot { width: 7px; height: 7px; background: #689a72; border-radius: 50%; box-shadow: 0 0 0 2px #dae9d7; }
 .mode-dot.paused { background: #b58b47; box-shadow: 0 0 0 2px #ecdfb8; }
+.shared-status { color: #486345; }
 .overlay { position: absolute; inset: 0 auto auto 0; width: 1586px; height: 992px; transform-origin: 0 0; pointer-events: none; visibility: hidden; }
 .scene[data-ready="true"] .overlay { visibility: visible; }
 .placement-hint { font-weight: 650; opacity: .82; border-left: 1px solid #b8c7a9; padding-left: 7px; }

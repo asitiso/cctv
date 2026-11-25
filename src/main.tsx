@@ -28,6 +28,7 @@ import { CalendarHoursDialog } from './calendar-hours-dialog.tsx'
 import { PlacementTargets, useStaffPlacement } from './placement-controls.tsx'
 import type { WorkPlacement } from './staff-placement.ts'
 import { readBoardDuty, saveBoardDuty } from './board-duty.ts'
+import { useSharedBoard } from './use-shared-board.ts'
 import { mascotMessage, mascotProfiles } from './mascots.ts'
 import { snackStatus } from './snack-breaks.ts'
 import { hasCheckoutBag, personalityStatus } from './staff-personalities.ts'
@@ -133,6 +134,23 @@ function App({ data, clock, assignments, placements, allowPlacement, placeFileSt
   const petLabels = useRef<HTMLSpanElement[]>([])
   const toggleFrame = useRef(false)
   toggleFrame.current = paused
+  const sharing = simulated && (location.protocol === 'https:' || location.hostname === 'localhost')
+  const sync = useSharedBoard(sharing, clock.date, board => {
+    const before = simulation.revision
+    simulation.setActiveRoster(board.active)
+    const staffing = simulation.staffing
+    if ((staffing === null) !== (board.staffing === null) ||
+      (staffing && board.staffing && (staffing.length !== board.staffing.length || staffing.some(id => !board.staffing?.includes(id))))) {
+      simulation.setStaffing(board.staffing)
+    }
+    simulation.setDutyOverrides(board.date === clock.date ? board.duties : [])
+    simulation.setSharedWork(board.date === clock.date ? board.work.map(([id, item]) => [id, item.activity]) : [])
+    if (simulation.revision === before) return
+    saveActiveRoster(simulation.activeRoster)
+    saveStaffing(simulation.staffing)
+    saveBoardDuty(clock.date, data, simulation.dutyOverrides)
+    setSnapshot(readSnapshot(simulation, simulated))
+  })
   const placement = useStaffPlacement(world, (id, activity) => {
     if (!allowPlacement) return false
     const returning = simulation.actors.some(actor => actor.person.id === id && actor.duty === 'off')
@@ -142,6 +160,13 @@ function App({ data, clock, assignments, placements, allowPlacement, placeFileSt
       if (!returning) return true
     }
     if (!simulation.placeStaff(id, activity)) return false
+    if (sharing) {
+      const duty = simulation.dutyOverrides.find(([staff]) => staff === id)?.[1] ?? null
+      sync.save({
+        ...(returning || activity === 'dayoff' ? { duties: [[id, duty]] } : {}),
+        work: [[id, activity === 'dayoff' ? null : activity]],
+      })
+    }
     if (returning || activity === 'dayoff') {
       saveBoardDuty(clock.date, data, simulation.dutyOverrides)
       setSnapshot(readSnapshot(simulation, simulated))
@@ -185,16 +210,22 @@ function App({ data, clock, assignments, placements, allowPlacement, placeFileSt
     : '근무표상 ' + workers.length + '명'
 
   function applyStaffing(ids: string[] | null) {
+    const removed = simulation.dutyOverrides.map(([id]) => [id, null] as [string, null])
     simulation.setStaffing(ids)
     saveStaffing(simulation.staffing)
     saveBoardDuty(clock.date, data, simulation.dutyOverrides)
+    sync.save({ staffing: simulation.staffing, duties: removed, work: simulation.activeRoster.map(id => [id, null]) })
     setSnapshot(readSnapshot(simulation, simulated))
   }
 
   function applyActiveRoster(ids: string[]) {
     const currentPick = placement.picked
     if (currentPick && !ids.includes(currentPick.id)) placement.dismiss()
+    const before = new Set(simulation.activeRoster)
     simulation.setActiveRoster(ids)
+    const after = new Set(simulation.activeRoster)
+    const changed = data.people.flatMap(({ id }) => before.has(id) === after.has(id) ? [] : [[id, after.has(id)] as [string, boolean]])
+    if (changed.length) sync.save({ active: changed })
     saveActiveRoster(simulation.activeRoster)
     saveStaffing(simulation.staffing)
     if (!ids.length) setReservesOpen(true)
@@ -383,6 +414,7 @@ function App({ data, clock, assignments, placements, allowPlacement, placeFileSt
           <span className={paused ? 'mode-dot paused' : 'mode-dot'} />
           {paused ? '시뮬레이션 일시정지' : snapshot.freeWalking ? '시뮬레이션 · 자율 이동'
             : hasManualPlacement ? '시뮬레이션 · 직접 배치' : '시뮬레이션 모드'}
+          {sharing && <span className="shared-status" role="status"> · {sync.status}</span>}
         </div> : <button type="button" className="mode-chip mode-work" onClick={openWork}
           aria-haspopup="dialog" aria-label={feedState || calendar ? workControl + ', ' + workLabel : workControl} title={workControl}>
           <span className={paused || (calendar && !knownSchedule) || (feedState && feedState.status !== 'ready') ? 'mode-dot paused' : 'mode-dot'} />
