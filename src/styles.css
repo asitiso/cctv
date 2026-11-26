@@ -47,6 +47,8 @@ button:focus-visible { outline: 2px solid #527d65; outline-offset: 4px; }
 .person-icon::before { width: 4px; height: 4px; border-radius: 50%; left: 3px; top: 0; }
 .person-icon::after { inset: 5px 1px 0; border-radius: 6px 6px 2px 2px; }
 .controls { justify-content: flex-end; gap: 7px; }
+.background-choice { display: flex; align-items: center; gap: 6px; color: #415b48; font-size: 12px; font-weight: 750; white-space: nowrap; }
+.background-choice select { height: 37px; padding: 0 6px; color: inherit; font: inherit; border: 1px solid #d4ddce; border-radius: 10px; background: #fffdf6; cursor: pointer; }
 .controls button {
   display: flex; align-items: center; justify-content: center; gap: 8px; height: 37px;
   color: #415b48; border: 1px solid #d4ddce; border-radius: 10px;
@@ -180,6 +182,7 @@ button:focus-visible { outline: 2px solid #527d65; outline-offset: 4px; }
   text-align: center; white-space: nowrap; font-weight: 850; line-height: 1.13;
 }
 .pet-bubble[data-pet="cat"] { background: #fff0e9; border-color: #c69787; }
+.pet-bubble[data-pet="rudolph"] { background: #fff3e9; border-color: #bd896f; }
 .pet-name { color: #576b43; font-size: calc(11px * var(--pet-bubble-scale, 1)); }
 .pet-bubble[data-pet="cat"] .pet-name { color: #8b5449; }
 .pet-message { font-size: calc(15px * var(--pet-bubble-scale, 1)); letter-spacing: -.018em; }
@@ -238,6 +241,8 @@ button:focus-visible { outline: 2px solid #527d65; outline-offset: 4px; }
   .brand p { font-size: 10px; }
   .controls { grid-column: 2; grid-row: 1; gap: 4px; }
   .controls button { height: 32px; }
+  .background-choice span { display: none; }
+  .background-choice select { height: 32px; font-size: 11px; padding-inline: 3px; }
   .pause-button { width: 32px; }
   .fullscreen-button { padding-inline: 7px; font-size: 10px; }
   .top-data { grid-column: 1 / -1; grid-row: 2; justify-content: space-between; gap: 5px; }
@@ -256,6 +261,9 @@ button:focus-visible { outline: 2px solid #527d65; outline-offset: 4px; }
   .roster-copy { grid-template-columns: 1fr; gap: 1px; }
   .roster-name small { display: none; }
   .roster-duty { font-size: 8px; }
+}
+@media (max-width: 330px) {
+  .brand-mark { display: none; }
 }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; }

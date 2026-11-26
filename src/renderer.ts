@@ -2,7 +2,7 @@ import { ellipse, round } from './architecture.ts'
 import { actorAnchor, CHARACTER_VISUAL_SCALE, cottageSeat, paintActor } from './characters.ts'
 import { activities, staffName, workAreaLabel } from './data.ts'
 import { gardenProps, paintBreeze, paintEntranceLight, paintFixtureDetail, paintGarden, paintGardenLighting,
-  paintLighting, paintSky, roomLighting } from './interior.ts'
+  paintLighting, paintSantaSnow, paintSky, roomLighting } from './interior.ts'
 import type { RoomLighting } from './interior.ts'
 import { COTTAGE, WORLD_HEIGHT, WORLD_WIDTH, cottageFurniture, project, roomProps, zoneSigns } from './layout.ts'
 import type { Actor, Simulation } from './simulation.ts'
@@ -13,6 +13,8 @@ import { mascotMessage, mascotProfiles } from './mascots.ts'
 import type { Mascot } from './mascots.ts'
 import { snackStatus } from './snack-breaks.ts'
 import { personalityStatus } from './staff-personalities.ts'
+import { backgrounds } from './scene-background.ts'
+import type { BackgroundId } from './scene-background.ts'
 
 type Context = CanvasRenderingContext2D
 type Art = Record<string, HTMLImageElement>
@@ -22,10 +24,11 @@ type SpriteProp = { art: string; x: number; y: number; width: number; height: nu
 
 const embedded = import.meta.glob([
   './art/staff-*.webp', './art/rest-*.webp', './art/room-*.webp',
-  './art/{pet-dog,pet-cat-white}.webp',
-  './art/{pharmacy-interior,book,open-box,hammock,sofa,bench,olive,topiary,flowers,blossom,plant,stool,box}.webp',
+  './art/{pet-dog,pet-cat-white,pet-rudolph}.webp',
+  './art/{pharmacy-interior,santa-interior,book,open-box,hammock,sofa,bench,olive,topiary,flowers,blossom,plant,stool,box}.webp',
 ], { eager: true, import: 'default', query: '?inline' }) as Record<string, string>
-const EXTRA = ['pharmacy-interior', 'book', 'open-box', ...mascotProfiles.map(pet => pet.sprite)]
+const EXTRA = [...Object.values(backgrounds).map(background => background.image), 'book', 'open-box',
+  ...mascotProfiles.map(pet => pet.sprite)]
 const BOARD_FONT = '750 14px "Board Sans", "Malgun Gothic", "Apple SD Gothic Neo", sans-serif'
 
 export const spriteSource = (sprite: string) => embedded['./art/' + sprite + '.webp']
@@ -245,15 +248,20 @@ function positionLeader(leader: HTMLDivElement, rect: Block, x: number, y: numbe
 function positionMascotBubbles(g: Context, bubbles: readonly Bubble[], pets: readonly Mascot[], occupied: Block[],
   time: number, scale: number, still: boolean) {
   g.font = `800 ${15 * scale}px "Board Sans", "Malgun Gothic", sans-serif`
-  pets.forEach((pet, index) => {
-    const bubble = bubbles[index]
-    const message = mascotMessage(pet, time)
+  bubbles.forEach((bubble, index) => {
+    const pet = pets[index]
+    const message = pet && mascotMessage(pet, time)
+    if (!pet || !message) {
+      bubble.box.hidden = true
+      bubble.leader.hidden = true
+      return
+    }
     const point = project(pet.x, pet.y)
     const anchor = { ...point, top: point.y - pet.height * CHARACTER_VISUAL_SCALE - 2 }
-    const rect = message && placeBubble(anchor, Math.ceil(g.measureText(message.text).width + 23 * scale), 39 * scale, false, occupied)
+    const rect = placeBubble(anchor, Math.ceil(g.measureText(message.text).width + 23 * scale), 39 * scale, false, occupied)
     bubble.box.hidden = !rect
     bubble.leader.hidden = !rect
-    if (!rect || !message) return
+    if (!rect) return
     const opacity = still ? '' : String(message.opacity)
     if (bubble.label.textContent !== message.text) bubble.label.textContent = message.text
     bubble.box.style.width = rect.width + 'px'
@@ -271,13 +279,16 @@ export function createRenderer(canvas: HTMLCanvasElement, positioner: HTMLDivEle
   const context = canvas.getContext('2d', { alpha: false })
   if (!context) throw new Error('이 브라우저에서 Canvas를 사용할 수 없습니다.')
   const g = context
-  const background = art['pharmacy-interior']
-  const garden = document.createElement('canvas')
-  garden.width = COTTAGE.width
-  garden.height = COTTAGE.height
-  const gardenContext = garden.getContext('2d')!
-  gardenContext.translate(-COTTAGE.left, -COTTAGE.top)
-  paintGarden(gardenContext)
+  function gardenArt(winter: boolean) {
+    const garden = document.createElement('canvas')
+    garden.width = COTTAGE.width
+    garden.height = COTTAGE.height
+    const gardenContext = garden.getContext('2d')!
+    gardenContext.translate(-COTTAGE.left, -COTTAGE.top)
+    paintGarden(gardenContext, winter)
+    return garden
+  }
+  const gardens = { pharmacy: gardenArt(false), santa: gardenArt(true) }
 
   const gardenObjects = gardenProps.map(item => ({ ...item, ...project(item.x, item.y) }))
   const widths = new Map<string, number>()
@@ -290,6 +301,7 @@ export function createRenderer(canvas: HTMLCanvasElement, positioner: HTMLDivEle
   let previousRevision = -1
   let previousNotes: NotesById | undefined
   let previousStill: boolean | undefined
+  let previousBackground: BackgroundId | undefined
 
   const resize = () => {
     const { width, height } = canvas.getBoundingClientRect()
@@ -304,19 +316,24 @@ export function createRenderer(canvas: HTMLCanvasElement, positioner: HTMLDivEle
     previousFrame = -1
   }
 
-  function draw(still: boolean, notes: NotesById) {
-    if (previousFrame === simulation.time && previousRevision === simulation.revision && previousNotes === notes && previousStill === still) return
+  function draw(still: boolean, notes: NotesById, backgroundId: BackgroundId) {
+    if (previousFrame === simulation.time && previousRevision === simulation.revision && previousNotes === notes &&
+      previousStill === still && previousBackground === backgroundId) return
     previousFrame = simulation.time
     previousRevision = simulation.revision
     previousNotes = notes
     previousStill = still
+    previousBackground = backgroundId
+    const background = art[backgrounds[backgroundId].image]
     const time = still ? 0 : simulation.time
     const { actors, mascots, minute } = simulation
     const lighting = roomLighting(minute)
     g.setTransform(scaleX * ratio, 0, 0, scaleY * ratio, 0, 0)
     g.drawImage(background, 0, 0, WORLD_WIDTH, WORLD_HEIGHT)
-    paintBreeze(g, background, time)
-    paintSky(g, lighting, time)
+    if (backgroundId === 'pharmacy') {
+      paintBreeze(g, background, time)
+      paintSky(g, lighting, time)
+    } else paintSantaSnow(g, time)
 
     const workers = actors.filter(actor => actor.present && actor.x < 20)
     const greetings = still ? undefined : staffGreetings(workers, time)
@@ -338,12 +355,12 @@ export function createRenderer(canvas: HTMLCanvasElement, positioner: HTMLDivEle
     paintEntranceLight(g, simulation.door)
     paintLighting(g, lighting, time)
 
-    drawGarden(actors, vacation, time, still, lighting)
+    drawGarden(gardens[backgroundId], actors, vacation, time, still, lighting)
     const occupied = positionBubbles(g, bubbles, actors, time, simulation.time, still, boards, widths, notes, simulated, mascots)
     positionMascotBubbles(g, petBubbles, mascots, occupied, simulation.time, petBubbleScale, still)
   }
 
-  function drawGarden(actors: Actor[], vacation: Actor[], time: number, still: boolean, lighting: RoomLighting) {
+  function drawGarden(garden: HTMLCanvasElement, actors: Actor[], vacation: Actor[], time: number, still: boolean, lighting: RoomLighting) {
     const { left, top, width, height } = COTTAGE
     round(g, left + 2, top + 4, width, height, 17, '#3b392341')
     g.drawImage(garden, left, top)

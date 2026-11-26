@@ -32,6 +32,7 @@ import { useSharedBoard } from './use-shared-board.ts'
 import { mascotMessage, mascotProfiles } from './mascots.ts'
 import { snackStatus } from './snack-breaks.ts'
 import { hasCheckoutBag, personalityStatus } from './staff-personalities.ts'
+import { backgrounds, isBackgroundId, readBackground, saveBackground } from './scene-background.ts'
 import './styles.css'
 
 const dutyLabels: Record<Duty, string> = {
@@ -103,11 +104,13 @@ type AppProps = {
 function App({ data, clock, assignments, placements, allowPlacement, placeFileStaff, hasWorkFile,
   feedState, notes, openNotes, appearances, openAppearance, openRoster, openWork }: AppProps) {
   const simulated = data.source === 'simulation'
+  const [background, setBackground] = useState(readBackground)
   const [simulation] = useState(() => {
     const current = createSimulation({ ...data, assignments }, simulated ? data.initialMinute : clock.minute,
       readStaffing(), placements, allowPlacement ? readBoardDuty(clock.date, data) : [],
       simulated ? readActiveRoster(data.people) : undefined)
     current.setAppearances(appearances)
+    current.showRudolph(background === 'santa')
     return current
   })
   const [snapshot, setSnapshot] = useState(() => readSnapshot(simulation, simulated))
@@ -121,6 +124,8 @@ function App({ data, clock, assignments, placements, allowPlacement, placeFileSt
   const [loadState, setLoadState] = useState<'loading' | 'ready' | 'error'>('loading')
   const notesRef = useRef(notes)
   notesRef.current = notes
+  const backgroundRef = useRef(background)
+  backgroundRef.current = background
   const clockRef = useRef<KoreaClock | undefined>(undefined)
   clockRef.current = simulated ? undefined : clock
   const world = useRef<HTMLDivElement>(null)
@@ -309,7 +314,7 @@ function App({ data, clock, assignments, placements, allowPlacement, placeFileSt
     void loadArt(assets).then(art => {
       if (disposed) return
       const renderer = createRenderer(surface, positioner, points, petPoints, simulation, art, simulated)
-      const draw = () => renderer.draw(reduced.matches, notesRef.current)
+      const draw = () => renderer.draw(reduced.matches, notesRef.current, backgroundRef.current)
       observer = new ResizeObserver(() => { renderer.resize(); draw() })
       observer.observe(surface)
       const loop = (timestamp: number) => {
@@ -330,7 +335,7 @@ function App({ data, clock, assignments, placements, allowPlacement, placeFileSt
       }
       window.render_game_to_text = () => JSON.stringify({
         coordinateSystem: 'walkable floor tiles projected into the pharmacy image; the cottage is a separate inset',
-        mode: data.source, minute: simulation.minute, elapsed: simulation.time, day: simulation.day,
+        mode: data.source, background: backgroundRef.current, minute: simulation.minute, elapsed: simulation.time, day: simulation.day,
         paused: toggleFrame.current, door: simulation.door, staffing: simulation.staffing, rendered: true,
         freeWalking: simulation.freeWalking, activeRoster: simulation.activeRoster,
         calendar: data.calendar,
@@ -391,6 +396,18 @@ function App({ data, clock, assignments, placements, allowPlacement, placeFileSt
             </button>}
       </div>
       <div className="controls">
+        <label className="background-choice">
+          <span>배경</span>
+          <select aria-label="배경" value={background} onChange={event => {
+            const next = event.currentTarget.value
+            if (!isBackgroundId(next)) return
+            simulation.showRudolph(next === 'santa')
+            setBackground(next)
+            saveBackground(next)
+          }}>
+            {Object.entries(backgrounds).map(([id, background]) => <option key={id} value={id}>{background.label}</option>)}
+          </select>
+        </label>
         <button className="pause-button" type="button" aria-label={paused ? '재생' : '일시정지'}
           title={paused ? '재생' : '일시정지'} onClick={() => setPaused(current => !current)}>
           <span aria-hidden="true" className={paused ? 'play-icon' : 'pause-icon'} />

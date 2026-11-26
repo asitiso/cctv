@@ -4,7 +4,7 @@ import { coffeeCounterX, cottageSeats, findPath, nearDoor, project, stations, ti
 import type { Tile } from './layout.ts'
 import { canPlaceStaff } from './staff-placement.ts'
 import type { PlacementActivity, WorkPlacement } from './staff-placement.ts'
-import { createMascots, reserveTiles, walkMascots } from './mascots.ts'
+import { createMascots, createRudolph, reserveTiles, walkMascots } from './mascots.ts'
 import { updateStamina } from './snack-breaks.ts'
 import type { Stamina } from './snack-breaks.ts'
 import { compoundingVisit, createCrowdReminder, createManagerRoutine, createSnackDetour, inspectionStops,
@@ -220,6 +220,16 @@ export function createSimulation(data: DataSource, startMinute = data.initialMin
 
   const actors = seedActors()
   const mascots = createMascots()
+  let rudolphEnabled = false
+
+  function addRudolph() {
+    if (mascots.some(pet => pet.id === 'rudolph')) return
+    const pet = createRudolph(mascots, actors, elapsed)
+    if (pet) {
+      mascots.push(pet)
+      revision++
+    }
+  }
   function refreshPersonalities() {
     if (data.source !== 'simulation') return
     const active = actors.filter(actor => activeRoster.has(actor.person.id))
@@ -506,6 +516,7 @@ export function createSimulation(data: DataSource, startMinute = data.initialMin
       const directorAtWork = director?.present && director.x < 20 && director.duty === 'working' ? director : undefined
       crowdReminder(directorAtWork, actors, partners, elapsed)
     }
+    if (rudolphEnabled) addRudolph()
     walkMascots(mascots, actors, elapsed, TICK_MS)
     const passingDoor = actors.some(actor => actor.moving && nearDoor(actor.x, actor.y))
     const target = passingDoor ? 1 : 0
@@ -515,6 +526,14 @@ export function createSimulation(data: DataSource, startMinute = data.initialMin
   return {
     actors,
     mascots,
+    showRudolph(show: boolean) {
+      rudolphEnabled = show
+      if (show) addRudolph()
+      else if (mascots.at(-1)?.id === 'rudolph') {
+        mascots.pop()
+        revision++
+      }
+    },
     get time() { return elapsed },
     get minute() { return minute },
     get day() { return data.source === 'simulation' ? Math.floor((startMinute + Math.floor(elapsed / data.millisecondsPerMinute)) / DAY) : 0 },

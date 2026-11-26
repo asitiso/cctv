@@ -103,6 +103,25 @@ export function paintSky(g: Context, { daylight, night, twilight, starlight }: R
   g.restore()
 }
 
+const winterPanes = [
+  [370, 118, 62, 70], [454, 118, 76, 71], [546, 118, 46, 69],
+  [670, 117, 72, 70], [765, 177, 85, 14], [886, 165, 83, 25], [989, 118, 72, 72],
+  [1137, 123, 83, 71], [1242, 125, 76, 70], [1341, 126, 79, 72],
+] as const
+
+export function paintSantaSnow(g: Context, time: number) {
+  if (time === 0) return
+  for (const [index, [left, top, width, height]] of winterPanes.entries()) {
+    for (let flake = 0; flake < 3; flake++) {
+      const offset = index * 41 + flake * 27
+      const fall = (offset + time * (.013 + flake * .006)) % height
+      const x = left + 4 + (offset * 7 % (width - 8)) + Math.sin(time / 1500 + offset) * 3
+      const alpha = Math.min(fall / 8, (height - fall) / 8, 1) * (.36 + flake * .12)
+      ellipse(g, x, top + fall, 1.25 + flake * .35, 1.25 + flake * .35, `rgba(255,255,250,${alpha})`)
+    }
+  }
+}
+
 export function paintLighting(g: Context, { daylight, night, twilight, lamps }: RoomLighting, time: number) {
   if (night > 0) {
     g.fillStyle = `rgba(33,47,77,${night * .36 * (1 - twilight * .3)})`
@@ -257,18 +276,21 @@ export const gardenProps = [
   { art: 'blossom', x: 24.9, y: 4.67, width: 29, height: 40, sway: .02 },
 ] as const
 
-export function paintGarden(g: Context) {
+export function paintGarden(g: Context, winter = false) {
   const { left, top, width, height } = COTTAGE
-  round(g, left, top, width, height, 17, gradient(g, left, top, left, top + height, '#edf1d9', '#dce8c3'), '#ede8ce')
+  const backdrop = winter ? ['#f8f2ea', '#e2edf1', '#f7e9d4'] : ['#edf1d9', '#dce8c3', '#ede8ce']
+  const lawn = winter ? ['#fffafa', '#cfe3eb', '#a9c2ca'] : ['#d5dda0', '#b6c183', '#94a064']
+  round(g, left, top, width, height, 17, gradient(g, left, top, left, top + height, backdrop[0], backdrop[1]), backdrop[2])
   const [u, v, x, y] = cottageFloor
   const topFace = [project(u, v), project(x, v), project(x, y), project(u, y)]
   const lower = topFace.map(point => ({ x: point.x, y: point.y + 10 }))
-  polygon(g, [topFace[1], topFace[2], lower[2], lower[1]], '#89a064')
-  polygon(g, [topFace[2], topFace[3], lower[3], lower[2]], '#b29e6a')
-  polygon(g, topFace, gradient(g, left, top + 80, left + width, top + height, '#d5dda0', '#b6c183'), '#94a064')
+  polygon(g, [topFace[1], topFace[2], lower[2], lower[1]], winter ? '#9eb5bd' : '#89a064')
+  polygon(g, [topFace[2], topFace[3], lower[3], lower[2]], winter ? '#bcd0d7' : '#b29e6a')
+  polygon(g, topFace, gradient(g, left, top + 80, left + width, top + height, lawn[0], lawn[1]), lawn[2])
   for (let i = 0; i < 62; i++) {
     const p = project(u + .19 + (i * .618 % 1) * (x - u - .38), v + .2 + (i * .413 % 1) * (y - v - .4))
-    ellipse(g, p.x, p.y, 1.8 + i % 2, .9, i % 2 ? '#7a9b584f' : '#f1edb88a', -.23)
+    const texture = winter ? ['#b8d2dc85', '#ffffffa0'] : ['#7a9b584f', '#f1edb88a']
+    ellipse(g, p.x, p.y, 1.8 + i % 2, .9, texture[i % 2], -.23)
   }
   for (const [cx, cy] of [[20.64, 3.43], [21.39, 3.78], [22.18, 4.1], [22.99, 3.85], [23.65, 3.55], [24.4, 3.33]]) {
     const p = project(cx, cy)

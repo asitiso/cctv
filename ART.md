@@ -33,6 +33,24 @@
 - 신규 인물 10종은 `src/art/staff-7.webp`부터 `staff-16.webp`까지에 있습니다. 원본 시안과 투명 WebP 후보는 `previews/`에 보관합니다. [신규 캐릭터 시안](previews/신규%20캐릭터%2010명.png)과 [제작 프롬프트](previews/아트%20프롬프트.md)를 참조할 수 있습니다.
 - 실내 가구의 바닥 면적은 `src/layout.ts`에서, 화면에서 인물을 가릴 윤곽은 `src/interior.ts`에서 조정합니다. 별장과 업무 소품은 개별 투명 이미지입니다.
 
+## 산타의 집
+
+- [산타의 집 실내 배경](src/art/santa-interior.webp)은 기존 약국의 창과 바닥 위치에 맞춘 1586×992 WebP입니다.
+- [루돌프](src/art/pet-rudolph.webp)는 모카와 같은 시점으로 그린 307×380 투명 WebP입니다.
+
+<details>
+<summary>산타의 집과 루돌프 제작 프롬프트</summary>
+
+### 산타의 집 실내
+
+> Create a gorgeous hand-painted cozy Santa's house Christmas winter background plate for an existing Korean chibi pharmacy / cozy simulation game, landscape 8:5 composition. EDIT the provided summer interior reference as an architectural template; preserve the camera angle, exact wood floor boundaries, all arch window shapes, placements, scale and mullions, and the rug footprint locations. Keep the 3 large back windows within the upper 35 percent and the warm empty wooden walking floor from about 42 percent to bottom. All freestanding counters, furniture, people and pets will be layered by the game, so keep the entire walkable floor clear of any new objects except the flat rugs and the tiny corner-edge decorative forms from the reference. This must look unmistakably like Santa's residence/workshop, but with the same light, detailed storybook texture, soft contrast, daytime framing, cozy hand-rendered wood, soft diffuse winter light and inviting bright atmosphere. Replace the summer gardens outside all three arches with a blue-white snowy North Pole village, frosted firs, snowdrifts, small toy-scale timber cottage exteriors and falling snow. Decorate the arches from the indoor side with fragrant evergreen ropes, small burgundy ribbons and scattered warm fairy bulbs, and a festive round wreath with broad crimson bow on the center window (above the lower window panes). Left wall nook holds wooden nutcracker, miniature wrapped presents and pine foliage, left wall has knitted stocking hanging above the floor. Warm light spruce-wood wainscot with slight evergreen tint, honey parquet floor. Existing very large rugs recolored to muted terracotta red and ivory fair-isle snowflake edging on the left, teal green and creamy wool on right, horizontal warm cream runner edged in sage red. Small top architectural perimeter of warmly lit decorations. Preserve unobstructed floor for characters. Keep this a FULL-BLEED interior, no framing border. No character, no Santa figure, no furniture, no huge doorway, no tree on the floor, no text, no watermark. Hand-crafted painterly background, premium game art. Same composition and window margins as input, do not change perspective.
+
+### 루돌프
+
+> Generate one transparent PNG game sprite of an extremely cute whimsical baby reindeer Rudolph in a friendly wide-eyed face, small rounded muzzle, gently rosy cheeks, soft hazelnut/caramel fur, oatmeal belly and chest and subtle amber shading, round shiny cherry-red nose (soft natural gleam), short fuzzy antlers with rounded tips, grass-green ribbon with tiny brass jingle bell. Full body sprite, all four tiny dark rounded hooves visible, facing to the RIGHT, side three-quarter view, slight camera look-down, same direction and proportion as corgi reference which is for camera angle, matte gouache storybook finish and pixel density only. Make it immediately and unmistakably a reindeer calf with small antlers and the iconic red nose, distinct from the corgi. Provide high quality detailed hand painted diffuse studio light, frosted softly textured children's picture book style with crisp naturally soft edges. Neutral pose with front hoof slightly raised for a gentle gait, no dynamic dust. Centered in frame generous transparent margins, no crop, genuinely transparent background, no text, no scenery, no outline, no watermark, no ground or external shadow; isolated sprite for the Santa house seasonal backdrop in a premium cozy Korean chibi simulation game.
+
+</details>
+
 
 ## 실내 리뉴얼
 

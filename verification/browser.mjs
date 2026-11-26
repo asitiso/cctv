@@ -17,7 +17,7 @@ const tick = (page, amount) => page.evaluate(ms => window.advanceTime(ms), amoun
 
 await mkdir(output, { recursive: true })
 
-async function open(viewport, extras = {}, clockTime, fullRoster = true) {
+async function open(viewport, extras = {}, clockTime, fullRoster = true, background = 'pharmacy') {
   const page = await browser.newPage({ viewport, offline: app.startsWith('file:'), ...extras })
   page.on('pageerror', error => errors.push(error.message))
   page.on('console', message => {
@@ -33,6 +33,10 @@ async function open(viewport, extras = {}, clockTime, fullRoster = true) {
     const key = 'pharmacy-cctv:active-roster:v1'
     if (localStorage.getItem(key) === null) localStorage.setItem(key, JSON.stringify(ids))
   }, allStaff)
+  if (background) await page.addInitScript(value => {
+    const key = 'pharmacy-cctv:background:v1'
+    if (localStorage.getItem(key) === null) localStorage.setItem(key, value)
+  }, background)
   await page.goto(app)
   await page.waitForFunction(() => document.querySelector('.scene[data-ready=true]') && window.render_game_to_text)
   await page.evaluate(() => document.fonts.ready)
@@ -497,6 +501,48 @@ function difference(before, after) {
   })
 }
 
+async function checkBackgrounds() {
+  for (const viewport of [{ width: 1440, height: 900 }, { width: 390, height: 844 }]) {
+    const page = await open(viewport, {}, undefined, false, null)
+    try {
+      await tick(page, 0)
+      await page.getByRole('button', { name: '일시정지', exact: true }).click()
+      const picker = page.getByRole('combobox', { name: '배경', exact: true })
+      const before = await status(page)
+      assert.equal(before.background, 'santa')
+      assert.equal(await picker.inputValue(), 'santa')
+      assert.deepEqual(before.pets.map(pet => pet.id), ['dog', 'cat', 'rudolph'])
+      const area = [[465, 125, 53, 52], [280, 615, 54, 55]]
+      const santaPixels = await sampleRegions(page, area)
+      await picker.selectOption('pharmacy')
+      await settled(page)
+      const pharmacy = await status(page)
+      assert.equal(pharmacy.background, 'pharmacy')
+      assert.equal(pharmacy.elapsed, before.elapsed)
+      assert.deepEqual(pharmacy.actors.map(actor => actor.screen), before.actors.map(actor => actor.screen))
+      assert.deepEqual(pharmacy.pets.map(pet => pet.id), ['dog', 'cat'])
+      assert.ok(difference(santaPixels, await sampleRegions(page, area)).every(amount => amount > .65))
+      await page.reload()
+      await page.waitForFunction(() => document.querySelector('.scene[data-ready=true]') && window.render_game_to_text)
+      assert.equal(await picker.inputValue(), 'pharmacy')
+      await tick(page, 0)
+      await picker.selectOption('santa')
+      const start = (await status(page)).pets.find(pet => pet.id === 'rudolph')
+      await tick(page, 16_350)
+      const later = (await status(page)).pets.find(pet => pet.id === 'rudolph')
+      assert.notDeepEqual(later.screen, start.screen)
+      assert.equal(later.message, '루돌프 출발!')
+      await checkLayout(page)
+      await page.screenshot({ path: output + 'santa-house-' + viewport.width + '.png', fullPage: true })
+      await picker.selectOption('pharmacy')
+      await settled(page)
+      assert.ok(await page.locator('[data-pet="rudolph"]').isHidden())
+    } finally {
+      await page.close()
+    }
+  }
+}
+
 async function checkBreeze() {
   const page = await open({ width: 1440, height: 900 }, { reducedMotion: 'reduce' })
   try {
@@ -869,6 +915,7 @@ async function checkCalendarRoster() {
 }
 
 try {
+  await checkBackgrounds()
   await checkActiveRoster()
   await checkMascots()
   await checkSnackBreaks()

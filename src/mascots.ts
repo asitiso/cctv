@@ -4,7 +4,7 @@ import type { Actor } from './simulation.ts'
 import { staffName } from './data.ts'
 
 type MascotProfile = {
-  id: 'dog' | 'cat'
+  id: 'dog' | 'cat' | 'rudolph'
   name: string
   sprite: string
   height: number
@@ -26,6 +26,12 @@ export const mascotProfiles: readonly MascotProfile[] = [
     route: [[28, 27], [23, 27], [22, 29], [24, 30], [30, 29], [31, 27]],
     messages: ['오늘도 고생 많아요!', '잠깐 숨 돌려요!', '당신을 응원해요!', '같이 힘내요!'],
     startsSpeaking: 10_700,
+  },
+  {
+    id: 'rudolph', name: '루돌프', sprite: 'pet-rudolph', height: 67, pace: 1.2,
+    route: [[25, 29], [27, 29], [26, 30], [23, 28], [21, 28]],
+    messages: ['루돌프 출발!', '오늘도 반짝!', '따뜻한 하루 되세요!'],
+    startsSpeaking: 15_700,
   },
 ]
 
@@ -53,11 +59,28 @@ const followOffsets: readonly Tile[] = [
 ]
 
 export function createMascots(): Mascot[] {
-  return mascotProfiles.map((profile, index) => ({
-    ...profile, tile: profile.route[0], ...tilePoint(profile.route[0]),
-    facing: index === 0 ? 1 : -1, movement: 0, leg: null, stop: 1, waitUntil: index === 0 ? 700 : 2250,
+  return mascotProfiles.filter(profile => profile.id !== 'rudolph')
+    .map(profile => startMascot(profile, profile.route[0], profile.id === 'dog' ? 700 : 2250))
+}
+
+function startMascot(profile: MascotProfile, tile: Tile, waitUntil: number): Mascot {
+  return {
+    ...profile, tile, ...tilePoint(tile),
+    facing: profile.id === 'cat' ? -1 : 1, movement: 0, leg: null,
+    stop: (profile.route.indexOf(tile) + 1) % profile.route.length, waitUntil,
     following: null, nextChoiceAt: 0,
-  }))
+  }
+}
+
+export function createRudolph(pets: readonly Mascot[], actors: readonly Actor[], time: number) {
+  const profile = mascotProfiles.find(pet => pet.id === 'rudolph')!
+  const occupied = new Set<number>()
+  for (const pet of pets) reserveTiles(occupied, pet)
+  for (const actor of actors) {
+    if (actor.present) reserveTiles(occupied, actor)
+  }
+  const tile = profile.route.find(point => !occupied.has(tileKey(point)))
+  return tile ? startMascot(profile, tile, time + 500) : undefined
 }
 
 export function mascotMessage(pet: MascotProfile, time: number) {
