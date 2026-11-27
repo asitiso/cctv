@@ -4,6 +4,7 @@ export const backgrounds = {
 } as const
 
 export type BackgroundId = keyof typeof backgrounds
+export const defaultBackground: BackgroundId = 'santa'
 const storageKey = 'pharmacy-cctv:background:v1'
 
 export function isBackgroundId(value: unknown): value is BackgroundId {
@@ -17,7 +18,7 @@ export function readBackground(): BackgroundId {
   } catch {
     // The scene still opens when browser storage is unavailable.
   }
-  return 'santa'
+  return defaultBackground
 }
 
 export function saveBackground(background: BackgroundId) {

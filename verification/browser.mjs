@@ -4,6 +4,7 @@ import { createServer } from 'node:http'
 import { resolve, sep } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { chromium } from 'playwright'
+import { applyBoardChange, currentSharedBoard, newSharedBoard, parseBoardChange } from '../src/shared-board.ts'
 
 const app = process.env.BOARD_URL ?? pathToFileURL(fileURLToPath(new URL('../약국 CCTV.html', import.meta.url))).href
 const output = resolve(process.env.BOARD_SCREENSHOT_DIR ?? fileURLToPath(new URL('./', import.meta.url))) + sep
@@ -543,6 +544,93 @@ async function checkBackgrounds() {
   }
 }
 
+async function checkSharedSettings() {
+  const html = await readFile(new URL('../약국 CCTV.html', import.meta.url))
+  let saved = newSharedBoard(Date.now())
+  let refuseWrites = false
+  const server = createServer(async (request, response) => {
+    if (request.url === '/') {
+      response.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' })
+      response.end(html)
+      return
+    }
+    if (request.url !== '/api/board-state') {
+      response.writeHead(404).end()
+      return
+    }
+    if (request.method === 'PATCH') {
+      if (refuseWrites) {
+        response.writeHead(503).end()
+        return
+      }
+      const chunks = []
+      for await (const chunk of request) chunks.push(chunk)
+      const change = parseBoardChange(JSON.parse(Buffer.concat(chunks).toString()))
+      assert.ok(change)
+      saved = applyBoardChange(saved, change, Date.now())
+    }
+    const { receipts, ...state } = currentSharedBoard(saved, Date.now())
+    response.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' })
+    response.end(JSON.stringify(state))
+  })
+  await new Promise(resolve => server.listen(0, resolve))
+  const url = 'http://localhost:' + server.address().port
+  const editor = await browser.newPage({ viewport: { width: 1440, height: 900 } })
+  const viewer = await browser.newPage({ viewport: { width: 390, height: 844 } })
+  for (const page of [editor, viewer]) page.on('pageerror', error => errors.push(error.message))
+  const saveStatus = page => page.locator('.shared-status').getByText('공유 저장됨', { exact: false })
+  const background = page => page.getByRole('combobox', { name: '배경', exact: true })
+  const nameButton = (page, name) => page.getByRole('button', { name: name + ' 이름·캐릭터 설정', exact: true })
+  const saveName = async (page, oldName, newName) => {
+    await nameButton(page, oldName).click()
+    const settings = page.getByRole('dialog', { name: '직원 이름·캐릭터 설정' })
+    await settings.getByLabel('표시 이름', { exact: true }).fill(newName)
+    await settings.getByRole('button', { name: '적용', exact: true }).click()
+  }
+
+  try {
+    await viewer.addInitScript(() => {
+      if (!localStorage.getItem('pharmacy-cctv:staff-names:v1')) {
+        localStorage.setItem('pharmacy-cctv:staff-names:v1', JSON.stringify({ 'demo:seoyeon': '브라우저이름' }))
+      }
+    })
+    await Promise.all([editor.goto(url), viewer.goto(url)])
+    await Promise.all([saveStatus(editor).waitFor(), saveStatus(viewer).waitFor()])
+    assert.equal(saved.revision, 0)
+    await nameButton(viewer, '서연').waitFor()
+    await editor.locator('.roster summary').click()
+
+    await background(editor).selectOption('pharmacy')
+    await saveStatus(editor).waitFor()
+    assert.equal(saved.background, 'pharmacy')
+    await viewer.evaluate(() => window.dispatchEvent(new Event('focus')))
+    await viewer.waitForFunction(() => document.querySelector('select[aria-label="배경"]')?.value === 'pharmacy')
+
+    refuseWrites = true
+    await saveName(editor, '서연', '김서연')
+    await editor.locator('.shared-status').getByText(/다시 연결 중/).waitFor()
+    assert.deepEqual(saved.names, [])
+    await nameButton(editor, '김서연').waitFor()
+    refuseWrites = false
+    await editor.reload()
+    await saveStatus(editor).waitFor()
+    assert.deepEqual(saved.names, [['seoyeon', '김서연']])
+    await viewer.reload()
+    await saveStatus(viewer).waitFor()
+    await nameButton(viewer, '김서연').waitFor()
+    assert.equal(await background(viewer).inputValue(), 'pharmacy')
+
+    await saveName(viewer, '김서연', '')
+    await saveStatus(viewer).waitFor()
+    await nameButton(viewer, '서연').waitFor()
+    assert.deepEqual(saved.names, [])
+    assert.equal(saved.background, 'pharmacy')
+  } finally {
+    await Promise.all([editor.close(), viewer.close()])
+    await new Promise(resolve => server.close(resolve))
+  }
+}
+
 async function checkBreeze() {
   const page = await open({ width: 1440, height: 900 }, { reducedMotion: 'reduce' })
   try {
@@ -915,6 +1003,7 @@ async function checkCalendarRoster() {
 }
 
 try {
+  await checkSharedSettings()
   await checkBackgrounds()
   await checkActiveRoster()
   await checkMascots()

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { CSSProperties } from 'react'
 import { createRoot } from 'react-dom/client'
-import { activities, demo, staffName, zoneLabels } from './data.ts'
+import { activities, demo, staffKey, staffName, zoneLabels } from './data.ts'
 import type { DataSource, Person } from './data.ts'
 import { COTTAGE, project } from './layout.ts'
 import { createRenderer, loadArt } from './renderer.ts'
@@ -29,10 +29,12 @@ import { PlacementTargets, useStaffPlacement } from './placement-controls.tsx'
 import type { WorkPlacement } from './staff-placement.ts'
 import { readBoardDuty, saveBoardDuty } from './board-duty.ts'
 import { useSharedBoard } from './use-shared-board.ts'
+import type { PublicBoard } from './shared-board.ts'
 import { mascotMessage, mascotProfiles } from './mascots.ts'
 import { snackStatus } from './snack-breaks.ts'
 import { hasCheckoutBag, personalityStatus } from './staff-personalities.ts'
 import { backgrounds, isBackgroundId, readBackground, saveBackground } from './scene-background.ts'
+import type { BackgroundId } from './scene-background.ts'
 import './styles.css'
 
 const dutyLabels: Record<Duty, string> = {
@@ -87,6 +89,11 @@ declare global {
 type AppProps = {
   data: DataSource
   clock: KoreaClock
+  background: BackgroundId
+  changeBackground: (background: BackgroundId) => void
+  sharing: boolean
+  sharedBoard: PublicBoard | null
+  sync: ReturnType<typeof useSharedBoard>
   assignments: DataSource['assignments']
   placements: DataSource['assignments']
   allowPlacement: boolean
@@ -101,10 +108,10 @@ type AppProps = {
   openWork: () => void
 }
 
-function App({ data, clock, assignments, placements, allowPlacement, placeFileStaff, hasWorkFile,
-  feedState, notes, openNotes, appearances, openAppearance, openRoster, openWork }: AppProps) {
+function App({ data, clock, background, changeBackground, sharing, sharedBoard, sync, assignments, placements,
+  allowPlacement, placeFileStaff, hasWorkFile, feedState, notes, openNotes, appearances,
+  openAppearance, openRoster, openWork }: AppProps) {
   const simulated = data.source === 'simulation'
-  const [background, setBackground] = useState(readBackground)
   const [simulation] = useState(() => {
     const current = createSimulation({ ...data, assignments }, simulated ? data.initialMinute : clock.minute,
       readStaffing(), placements, allowPlacement ? readBoardDuty(clock.date, data) : [],
@@ -139,23 +146,7 @@ function App({ data, clock, assignments, placements, allowPlacement, placeFileSt
   const petLabels = useRef<HTMLSpanElement[]>([])
   const toggleFrame = useRef(false)
   toggleFrame.current = paused
-  const sharing = simulated && (location.protocol === 'https:' || location.hostname === 'localhost')
-  const sync = useSharedBoard(sharing, clock.date, board => {
-    const before = simulation.revision
-    simulation.setActiveRoster(board.active)
-    const staffing = simulation.staffing
-    if ((staffing === null) !== (board.staffing === null) ||
-      (staffing && board.staffing && (staffing.length !== board.staffing.length || staffing.some(id => !board.staffing?.includes(id))))) {
-      simulation.setStaffing(board.staffing)
-    }
-    simulation.setDutyOverrides(board.date === clock.date ? board.duties : [])
-    simulation.setSharedWork(board.date === clock.date ? board.work.map(([id, item]) => [id, item.activity]) : [])
-    if (simulation.revision === before) return
-    saveActiveRoster(simulation.activeRoster)
-    saveStaffing(simulation.staffing)
-    saveBoardDuty(clock.date, data, simulation.dutyOverrides)
-    setSnapshot(readSnapshot(simulation, simulated))
-  })
+  const shareRoster = simulated && sharing
   const placement = useStaffPlacement(world, (id, activity) => {
     if (!allowPlacement) return false
     const returning = simulation.actors.some(actor => actor.person.id === id && actor.duty === 'off')
@@ -165,7 +156,7 @@ function App({ data, clock, assignments, placements, allowPlacement, placeFileSt
       if (!returning) return true
     }
     if (!simulation.placeStaff(id, activity)) return false
-    if (sharing) {
+    if (shareRoster) {
       const duty = simulation.dutyOverrides.find(([staff]) => staff === id)?.[1] ?? null
       sync.save({
         ...(returning || activity === 'dayoff' ? { duties: [[id, duty]] } : {}),
@@ -241,6 +232,29 @@ function App({ data, clock, assignments, placements, allowPlacement, placeFileSt
     simulation.setDutyOverrides(allowPlacement ? readBoardDuty(clock.date, data) : [])
     setSnapshot(readSnapshot(simulation, simulated))
   }, [allowPlacement, clock.date, data, simulated, simulation])
+
+  useEffect(() => {
+    if (!shareRoster || !sharedBoard) return
+    const before = simulation.revision
+    simulation.setActiveRoster(sharedBoard.active)
+    const staffing = simulation.staffing
+    if ((staffing === null) !== (sharedBoard.staffing === null) ||
+      (staffing && sharedBoard.staffing && (staffing.length !== sharedBoard.staffing.length ||
+        staffing.some(id => !sharedBoard.staffing?.includes(id))))) {
+      simulation.setStaffing(sharedBoard.staffing)
+    }
+    simulation.setDutyOverrides(sharedBoard.date === clock.date ? sharedBoard.duties : [])
+    simulation.setSharedWork(sharedBoard.date === clock.date ? sharedBoard.work.map(([id, item]) => [id, item.activity]) : [])
+    if (simulation.revision === before) return
+    saveActiveRoster(simulation.activeRoster)
+    saveStaffing(simulation.staffing)
+    saveBoardDuty(clock.date, data, simulation.dutyOverrides)
+    setSnapshot(readSnapshot(simulation, simulated))
+  }, [shareRoster, sharedBoard, clock.date, data, simulated, simulation])
+
+  useEffect(() => {
+    simulation.showRudolph(background === 'santa')
+  }, [background, simulation])
 
   useEffect(() => {
     simulation.setAssignments(assignments)
@@ -400,10 +414,7 @@ function App({ data, clock, assignments, placements, allowPlacement, placeFileSt
           <span>배경</span>
           <select aria-label="배경" value={background} onChange={event => {
             const next = event.currentTarget.value
-            if (!isBackgroundId(next)) return
-            simulation.showRudolph(next === 'santa')
-            setBackground(next)
-            saveBackground(next)
+            if (isBackgroundId(next)) changeBackground(next)
           }}>
             {Object.entries(backgrounds).map(([id, background]) => <option key={id} value={id}>{background.label}</option>)}
           </select>
@@ -431,7 +442,7 @@ function App({ data, clock, assignments, placements, allowPlacement, placeFileSt
           <span className={paused ? 'mode-dot paused' : 'mode-dot'} />
           {paused ? '시뮬레이션 일시정지' : snapshot.freeWalking ? '시뮬레이션 · 자율 이동'
             : hasManualPlacement ? '시뮬레이션 · 직접 배치' : '시뮬레이션 모드'}
-          {sharing && <span className="shared-status" role="status"> · {sync.status}</span>}
+          {shareRoster && <span className="shared-status" role="status"> · {sync.status}</span>}
         </div> : <button type="button" className="mode-chip mode-work" onClick={openWork}
           aria-haspopup="dialog" aria-label={feedState || calendar ? workControl + ', ' + workLabel : workControl} title={workControl}>
           <span className={paused || (calendar && !knownSchedule) || (feedState && feedState.status !== 'ready') ? 'mode-dot paused' : 'mode-dot'} />
@@ -566,6 +577,9 @@ function App({ data, clock, assignments, placements, allowPlacement, placeFileSt
 function Board() {
   const [appearancePreferences, setAppearancePreferences] = useState(readAppearances)
   const [displayNames, setDisplayNames] = useState(readDisplayNames)
+  const [sharedNames, setSharedNames] = useState<typeof displayNames | null>(null)
+  const [background, setBackground] = useState(readBackground)
+  const [sharedBoard, setSharedBoard] = useState<PublicBoard | null>(null)
   const [appearanceTarget, setAppearanceTarget] = useState<string | null>(null)
   const [notes, setNotes] = useState(readNotes)
   const [notesOpen, setNotesOpen] = useState(false)
@@ -578,6 +592,14 @@ function Board() {
   const [revision, setRevision] = useState(0)
   const [clock, setClock] = useState(koreaClock)
   const date = clock.date
+  const sharing = location.protocol === 'https:' || location.hostname === 'localhost'
+  const sync = useSharedBoard(sharing, date, board => {
+    setSharedBoard(board)
+    setBackground(board.background)
+    const entries = board.names.map(([id, name]) => [staffKey({ id, name }, 'simulation'), name] as const)
+    setSharedNames(previous => previous && entries.length === Object.keys(previous).length &&
+      entries.every(([key, name]) => previous[key] === name) ? previous : Object.fromEntries(entries))
+  })
   const currentRoster = feed ? feed.snapshot?.roster : roster
   const currentWork = feed ? (feed.status === 'ready' ? feed.snapshot?.work ?? noWork : noWork) : work
   const connected = Boolean(roster || endpoint)
@@ -589,9 +611,13 @@ function Board() {
     [endpoint, placedWork, data.people, date])
   const appKey = feed ? 'feed:' + feed.url + ':' + date + ':' + feed.rosterRevision
     : roster ? 'file:' + date + ':' + revision : 'simulation'
+  const shareNames = sharing && data.source === 'simulation'
+  const names = shareNames && sharedNames ? sharedNames : displayNames
   const appearances = useMemo(() => applyDisplayNames(applyAppearances(data.people, data.source, appearancePreferences),
-    data.source, displayNames), [data, appearancePreferences, displayNames])
+    data.source, names), [data, appearancePreferences, names])
   const displayedNotes = useMemo(() => notesForPeople(notes, data.people, data.source), [notes, data])
+
+  useEffect(() => { saveBackground(background) }, [background])
 
   useEffect(() => {
     saveNotes(notes)
@@ -657,13 +683,32 @@ function Board() {
   }
 
   function replaceAppearance(id: string, sprite: string, name: string) {
-    const renamed = chooseDisplayName(displayNames, data.source, data.people, id, name)
+    const renamed = chooseDisplayName(names, data.source, data.people, id, name)
     const next = chooseAppearance(appearancePreferences, data.source, appearances, id, sprite)
     saveAppearances(next)
-    saveDisplayNames(renamed)
     setAppearancePreferences(next)
-    setDisplayNames(renamed)
+    if (renamed !== names) {
+      const person = data.people.find(item => item.id === id)
+      if (person) {
+        const key = staffKey(person, data.source)
+        const selectedName = renamed[key]
+        const local = { ...displayNames }
+        if (selectedName) local[key] = selectedName
+        else delete local[key]
+        setDisplayNames(local)
+        saveDisplayNames(local)
+        if (shareNames) {
+          setSharedNames(renamed)
+          sync.save({ names: [[id, selectedName ?? null]] })
+        }
+      }
+    }
     setAppearanceTarget(null)
+  }
+
+  function changeBackground(next: BackgroundId) {
+    setBackground(next)
+    sync.save({ background: next })
   }
 
   function publishNote(author: string, recipient: string, text: string) {
@@ -674,6 +719,7 @@ function Board() {
   return <>
     <App key={appKey} data={data} feedState={feed}
       clock={clock} assignments={assignments} hasWorkFile={work.length > 0}
+      background={background} changeBackground={changeBackground} sharing={sharing} sharedBoard={sharedBoard} sync={sync}
       placements={placements} allowPlacement={!endpoint} placeFileStaff={placeFileStaff}
       appearances={appearances} openAppearance={setAppearanceTarget}
       notes={displayedNotes} openNotes={() => setNotesOpen(true)}

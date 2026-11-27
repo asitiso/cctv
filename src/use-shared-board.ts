@@ -5,7 +5,7 @@ import type { BoardChange, BoardEdit, PublicBoard } from './shared-board.ts'
 const pendingPrefix = 'pharmacy-cctv:shared-edits:v1:'
 const endpoint = '/api/board-state'
 const pollMilliseconds = 8000
-type SyncStatus = '조회 중' | '공유 저장됨' | '저장 중' | '다시 연결 중'
+type SyncStatus = '조회 중' | '공유 저장됨' | '저장 중' | '다시 연결 중' | '이미 사용 중인 이름'
 type Pending = { key: string; edit: BoardChange }
 
 function readPending(): Pending[] {
@@ -58,7 +58,8 @@ export function useSharedBoard(enabled: boolean, date: string, apply: (board: Pu
           body: edit ? JSON.stringify(edit) : undefined,
           cache: 'no-store', signal: AbortSignal.timeout(5500),
         })
-        if (!response.ok) throw new Error('Shared board request failed')
+        const conflictingName = Boolean(edit?.names?.length && response.status === 422)
+        if (!response.ok && !conflictingName) throw new Error('Shared board request failed')
         const board = await response.json() as PublicBoard
         if (!active) return
         if (item) {
@@ -70,7 +71,7 @@ export function useSharedBoard(enabled: boolean, date: string, apply: (board: Pu
           applyRef.current(board)
         }
         received = true
-        setStatus(pending.length ? '저장 중' : '공유 저장됨')
+        setStatus(pending.length ? '저장 중' : conflictingName ? '이미 사용 중인 이름' : '공유 저장됨')
       } catch {
         if (active) setStatus('다시 연결 중')
         received = false

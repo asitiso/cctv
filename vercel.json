@@ -3,7 +3,7 @@
   "regions": ["icn1"],
   "functions": {
     "api/board-state.ts": {
-      "includeFiles": "src/{shared-board.ts,data.ts,schedule.ts,staff-placement.ts,layout.ts,demo.json}"
+      "includeFiles": "src/{shared-board.ts,scene-background.ts,appearance.ts,data.ts,schedule.ts,staff-placement.ts,layout.ts,demo.json}"
     }
   }
 }

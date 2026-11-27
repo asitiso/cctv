@@ -95,8 +95,12 @@ export function saveAppearances(preferences: AppearancePreferences) {
   }
 }
 
-function cleanDisplayName(value: string) {
+export function cleanDisplayName(value: string) {
   return value.replace(/[\s]+/g, ' ').trim()
+}
+
+export function isValidDisplayName(name: string) {
+  return name.length > 0 && name.length <= displayNameLimit && !/[\x00-\x1f\x7f]/u.test(name)
 }
 
 export function applyDisplayNames(people: readonly Person[], scope: Scope, names: AppearancePreferences): Person[] {
@@ -115,7 +119,7 @@ export function chooseDisplayName(names: AppearancePreferences, scope: Scope, pe
     delete next[key]
     return next
   }
-  if (name.length > displayNameLimit || /[\x00-\x1f\x7f]/u.test(name)) throw new Error('표시 이름은 24글자 이내로 입력하세요.')
+  if (!isValidDisplayName(name)) throw new Error('표시 이름은 24글자 이내로 입력하세요.')
   const used = applyDisplayNames(people, scope, names)
     .some(item => item.id !== id && (staffName(item) === name || item.name === name))
   if (used) throw new Error('다른 직원이 쓰는 이름입니다.')
@@ -129,7 +133,7 @@ export function readDisplayNames(): AppearancePreferences {
     return Object.fromEntries(Object.entries(value).flatMap(([key, input]) => {
       if (typeof input !== 'string' || !(key.startsWith('demo:') || key.startsWith('roster:'))) return []
       const name = cleanDisplayName(input)
-      return name && name.length <= displayNameLimit && !/[\x00-\x1f\x7f]/u.test(name) ? [[key, name]] : []
+      return isValidDisplayName(name) ? [[key, name]] : []
     }))
   } catch {
     return {}

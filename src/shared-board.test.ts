@@ -38,3 +38,35 @@ test('공유 파일은 시뮬레이션 직원과 지원되는 업무만 기록�
   assert.equal(parseBoardChange({ ...base, work: [['junho', 'dayoff']] }), null)
   assert.equal(parseBoardChange({ ...base, duties: [['junho', 'off'], ['junho', 'working']] }), null)
 })
+
+test('기존 공유 파일을 읽고 새 배경과 직원 이름을 자정이 지나도 유지한다', () => {
+  const { background: _background, names: _names, ...legacy } = newSharedBoard(now)
+  const old = currentSharedBoard(legacy, now)
+  assert.equal(old.background, 'santa')
+  assert.deepEqual(old.names, [])
+
+  const first = parseBoardChange({ id: firstId, date: old.date, background: 'pharmacy', names: [['seoyeon', ' 김서연 ']] })
+  assert.ok(first)
+  const saved = applyBoardChange(legacy, first, now)
+  const reset = parseBoardChange({ id: secondId, date: old.date, names: [['seoyeon', null], ['junho', '김준호']] })
+  assert.ok(reset)
+  assert.deepEqual(saved.names, [['seoyeon', '김서연']])
+  const next = currentSharedBoard(applyBoardChange(saved, reset, now), now + 86_400_000)
+  assert.equal(next.background, 'pharmacy')
+  assert.deepEqual(next.names, [['junho', '김준호']])
+  assert.deepEqual(next.active, old.active)
+})
+
+test('공유 파일은 올바른 배경과 중복되지 않는 표시 이름만 저장한다', () => {
+  const board = newSharedBoard(now)
+  const base = { id: firstId, date: board.date }
+  assert.equal(parseBoardChange({ ...base, background: 'unknown' }), null)
+  assert.equal(parseBoardChange({ ...base, names: [['unknown-person', '직원']] }), null)
+  assert.equal(parseBoardChange({ ...base, names: [['junho', '글'.repeat(25)]] }), null)
+  const first = parseBoardChange({ ...base, names: [['seoyeon', '새이름']] })
+  assert.ok(first)
+  const renamed = applyBoardChange(board, first, now)
+  const duplicate = parseBoardChange({ ...base, id: secondId, names: [['junho', '새이름']] })
+  assert.ok(duplicate)
+  assert.throws(() => applyBoardChange(renamed, duplicate, now), /다른 직원이 쓰는 이름입니다/)
+})

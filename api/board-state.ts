@@ -1,7 +1,7 @@
 import { get, list, put } from '@vercel/blob'
 import { getCache } from '@vercel/functions'
-import { applyBoardChange, currentSharedBoard, newSharedBoard, parseBoardChange } from '../src/shared-board.ts'
-import type { SharedBoard } from '../src/shared-board.ts'
+import { applyBoardChange, currentSharedBoard, newSharedBoard, parseBoardChange, SharedNameConflict } from '../src/shared-board.ts'
+import type { StoredBoard } from '../src/shared-board.ts'
 
 const prefix = process.env.VERCEL_ENV === 'preview' ? 'preview-board/v1/' : 'shared-board/v1/'
 const cacheKey = 'cctv-shared-board-v1'
@@ -21,14 +21,14 @@ async function loadBoard() {
   if (!path) return newSharedBoard(Date.now())
   const blob = await get(path, { access: 'private' })
   if (blob?.statusCode !== 200 || !blob.stream) throw new Error('Shared board file is unavailable')
-  return await new Response(blob.stream).json() as SharedBoard
+  return await new Response(blob.stream).json() as StoredBoard
 }
 
 function blobPath(revision: number) {
   return prefix + String(largestRevisionCode - revision).padStart(12, '0') + '.json'
 }
 
-async function publish(board: SharedBoard) {
+async function publish(board: StoredBoard) {
   try {
     const cache = getCache()
     await cache.set(cacheKey, board, { ttl: 3600, tags: [cacheKey] })
@@ -41,7 +41,7 @@ async function publish(board: SharedBoard) {
 
 async function readBoard() {
   try {
-    const cached = await getCache().get(cacheKey) as SharedBoard | null
+    const cached = await getCache().get(cacheKey) as StoredBoard | null
     if (cached) return cached
   } catch {
     // Read the file directly if the cache is unavailable.
@@ -51,7 +51,7 @@ async function readBoard() {
   return board
 }
 
-function publicState(board: SharedBoard) {
+function publicState(board: StoredBoard) {
   const { receipts: _receipts, ...state } = currentSharedBoard(board, Date.now())
   return state
 }
@@ -71,7 +71,13 @@ export default {
       for (let attempt = 0; attempt < 5; attempt++) {
         const before = await loadBoard()
         if (before.receipts.includes(edit.id)) return send(publicState(before))
-        const next = applyBoardChange(before, edit, Date.now())
+        let next
+        try {
+          next = applyBoardChange(before, edit, Date.now())
+        } catch (error) {
+          if (error instanceof SharedNameConflict) return send(publicState(before), 422)
+          throw error
+        }
         try {
           await put(blobPath(next.revision), JSON.stringify(next), {
             access: 'private', allowOverwrite: false, addRandomSuffix: false, contentType: 'application/json',
